@@ -57,6 +57,7 @@ def run_single(
     cancel_event: threading.Event,
     on_progress=None,
     on_log=None,
+    on_proc_start=None,
 ) -> tuple[bool, str]:
     """Execute a single FFmpeg command with progress tracking.
 
@@ -65,8 +66,9 @@ def run_single(
         ffprobe_path: Path to ffprobe binary.
         args: FFmpeg arguments (without the binary name).
         cancel_event: Threading event to signal cancellation.
-        on_progress: Callback(percent: float, time_str: str, speed: str, fps: str).
+        on_progress: Callback(percent: float, time_str: str, speed: str, fps: str, current_seconds: float, total_duration_seconds: float).
         on_log: Callback(line: str).
+        on_proc_start: Callback(proc: subprocess.Popen) called when process starts.
 
     Returns:
         Tuple of (success: bool, error_message: str).
@@ -97,6 +99,9 @@ def run_single(
     except OSError as e:
         logger.error("Failed to start ffmpeg: {}", e)
         return False, str(e)
+
+    if on_proc_start:
+        on_proc_start(proc)
 
     last_progress_time = 0.0
     current_speed = ""
@@ -129,7 +134,7 @@ def run_single(
                         now = time.monotonic()
                         if now - last_progress_time >= 0.5:
                             last_progress_time = now
-                            on_progress(percent, match.group(0), current_speed, current_fps)
+                            on_progress(percent, match.group(0), current_speed, current_fps, current, duration)
         except Exception:
             pass
 
@@ -170,7 +175,7 @@ def run_single(
 
     if returncode == 0:
         if on_progress:
-            on_progress(100, "", current_speed, current_fps)
+            on_progress(100, "", current_speed, current_fps, duration, duration)
         logger.info("FFmpeg completed successfully")
         return True, ""
     else:

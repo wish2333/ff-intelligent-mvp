@@ -39,7 +39,7 @@ def setup_frontend_sink(emit_fn) -> None:
     _frontend_sink_id = logger.add(
         _sink,
         format="{message}",
-        level="DEBUG",
+        level="WARNING",
     )
 
 

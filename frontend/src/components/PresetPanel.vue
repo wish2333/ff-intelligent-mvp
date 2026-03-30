@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, inject, type Ref } from "vue";
-import type { PresetDTO } from "../composables/usePresets";
+import { ref, computed, inject } from "vue";
 
 const emit = defineEmits<{
   presetSelected: [presetId: string];

@@ -49,13 +49,12 @@ onMounted(async () => {
   console.log("[App] PyWebView ready");
 
   // Debug: Listen to ALL pywebvue events to verify event system
-  window.addEventListener('pywebvue:task_start', (e) => console.log('[App] GLOBAL task_start:', e.detail));
-  window.addEventListener('pywebvue:batch_progress', (e) => console.log('[App] GLOBAL batch_progress:', e.detail));
-  window.addEventListener('pywebvue:task_progress', (e) => console.log('[App] GLOBAL task_progress:', e.detail));
-  window.addEventListener('pywebvue:task_complete', (e) => console.log('[App] GLOBAL task_complete:', e.detail));
-  window.addEventListener('pywebvue:task_error', (e) => console.log('[App] GLOBAL task_error:', e.detail));
-  window.addEventListener('pywebvue:batch_complete', (e) => console.log('[App] GLOBAL batch_complete:', e.detail));
-  window.addEventListener('pywebvue:log_line', (e) => console.log('[App] GLOBAL log_line:', e.detail));
+  window.addEventListener('pywebvue:task_start', (e: Event) => console.log('[App] GLOBAL task_start:', (e as CustomEvent).detail));
+  window.addEventListener('pywebvue:batch_progress', (e: Event) => console.log('[App] GLOBAL batch_progress:', (e as CustomEvent).detail));
+  window.addEventListener('pywebvue:task_progress', (e: Event) => console.log('[App] GLOBAL task_progress:', (e as CustomEvent).detail));
+  window.addEventListener('pywebvue:task_complete', (e: Event) => console.log('[App] GLOBAL task_complete:', (e as CustomEvent).detail));
+  window.addEventListener('pywebvue:task_error', (e: Event) => console.log('[App] GLOBAL task_error:', (e as CustomEvent).detail));
+  window.addEventListener('pywebvue:batch_complete', (e: Event) => console.log('[App] GLOBAL batch_complete:', (e as CustomEvent).detail));
 
   // Setup FFmpeg (critical)
   console.log("[App] Calling setup_ffmpeg...");

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { inject } from "vue";
 import { useBatchProcess, type TaskProgressData } from "../composables/useBatchProcess";
-import LogViewer from "./LogViewer.vue";
 
 const batchProcess = inject<ReturnType<typeof useBatchProcess>>("batchProcess");
 if (!batchProcess) {
@@ -14,7 +13,6 @@ const {
   overallTotal,
   overallCompleted,
   taskProgressMap,
-  logLines,
 } = batchProcess;
 
 function statusBadge(status: string): string {
@@ -22,6 +20,7 @@ function statusBadge(status: string): string {
     case "running": return "badge-info";
     case "done": return "badge-success";
     case "error": return "badge-error";
+    case "cancelled": return "badge-warning";
     default: return "badge-ghost";
   }
 }
@@ -31,6 +30,7 @@ function statusLabel(status: string): string {
     case "done": return "Done";
     case "error": return "Error";
     case "running": return "Running";
+    case "cancelled": return "Cancelled";
     default: return status;
   }
 }
@@ -40,6 +40,18 @@ function formatProgressInfo(task: TaskProgressData): string {
   if (task.speed) parts.push(`speed=${task.speed}`);
   if (task.fps) parts.push(`fps=${task.fps}`);
   return parts.join(" | ");
+}
+
+function formatTime(seconds: number | undefined): string {
+  if (seconds == null || seconds < 0) return "--:--";
+  const totalSec = Math.floor(seconds);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 const tasksList = () => Object.values(taskProgressMap.value);
@@ -75,6 +87,9 @@ const tasksList = () => Object.values(taskProgressMap.value);
           :value="task.percent"
           max="100"
         ></progress>
+        <span v-if="task.status === 'running'" class="text-xs text-base-content/50 whitespace-nowrap">
+          {{ formatTime(task.current_seconds) }}/{{ formatTime(task.total_duration_seconds) }}
+        </span>
         <span v-if="task.status === 'running' && formatProgressInfo(task)" class="text-xs text-base-content/50 whitespace-nowrap">
           {{ formatProgressInfo(task) }}
         </span>
@@ -86,13 +101,5 @@ const tasksList = () => Object.values(taskProgressMap.value);
         </span>
       </div>
     </div>
-
-    <!-- Log viewer -->
-    <details v-if="logLines.length > 0" class="collapse collapse-arrow bg-base-200">
-      <summary class="collapse-title text-xs py-1 min-h-0">FFmpeg Log</summary>
-      <div class="collapse-content">
-        <LogViewer :log-lines="logLines" />
-      </div>
-    </details>
   </div>
 </template>

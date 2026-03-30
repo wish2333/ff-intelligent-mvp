@@ -40,8 +40,10 @@ class TaskProgress:
     file_name: str
     percent: float = 0.0
     time_str: str = ""
-    status: str = "pending"  # pending | running | done | error
+    status: str = "pending"  # pending | running | done | error | cancelled
     error: str = ""
     output_path: str = ""
     speed: str = ""
     fps: str = ""
+    current_seconds: float = 0.0
+    total_duration_seconds: float = 0.0

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, Future
@@ -57,6 +58,8 @@ class BatchRunner:
         self._completed = 0
         self._errors = 0
         self._progress_map: dict[int, TaskProgress] = {}
+        self._running_procs: dict[int, subprocess.Popen] = {}
+        self._procs_lock = threading.Lock()
 
     @property
     def is_running(self) -> bool:
@@ -80,6 +83,7 @@ class BatchRunner:
         self._completed = 0
         self._errors = 0
         self._progress_map.clear()
+        self._running_procs.clear()
 
         batch_timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M")
         logger.info(
@@ -149,7 +153,7 @@ class BatchRunner:
 
             args = pm.resolve_command(preset, file_item.path, output_path)
 
-            def on_progress(percent: float, time_str: str, speed: str = "", fps: str = "") -> None:
+            def on_progress(percent: float, time_str: str, speed: str = "", fps: str = "", current_seconds: float = 0.0, total_duration_seconds: float = 0.0) -> None:
                 logger.debug("[on_progress] Task {}: {:.1f}% time={} speed={} fps={}", index, percent, time_str, speed, fps)
                 self._progress_map[index] = TaskProgress(
                     file_index=index,
@@ -159,6 +163,8 @@ class BatchRunner:
                     status="running",
                     speed=speed,
                     fps=fps,
+                    current_seconds=current_seconds,
+                    total_duration_seconds=total_duration_seconds,
                 )
                 self._emit("task_progress", {
                     "file_index": index,
@@ -167,11 +173,13 @@ class BatchRunner:
                     "time_str": time_str,
                     "speed": speed,
                     "fps": fps,
+                    "current_seconds": current_seconds,
+                    "total_duration_seconds": total_duration_seconds,
                 })
 
-            def on_log(line: str) -> None:
-                logger.debug("[on_log] Task {}: {}", index, line.rstrip())
-                self._emit("log_line", {"line": line})
+            def on_proc_start(proc) -> None:
+                with self._procs_lock:
+                    self._running_procs[index] = proc
 
             success, error = run_single(
                 ffmpeg_path=ffmpeg_path,
@@ -179,8 +187,12 @@ class BatchRunner:
                 args=args,
                 cancel_event=self._cancel_event,
                 on_progress=on_progress,
-                on_log=on_log,
+                on_proc_start=on_proc_start,
             )
+
+            # Remove proc from tracking
+            with self._procs_lock:
+                self._running_procs.pop(index, None)
 
             if success:
                 logger.info("[_run_task] Task {} succeeded, emitting task_complete", index)
@@ -197,6 +209,21 @@ class BatchRunner:
                     "output_path": output_path,
                 })
                 logger.info("[{}/{}] Done: {}", index + 1, self._total, file_item.name)
+            elif self._cancel_event.is_set():
+                logger.info("[_run_task] Task {} cancelled", index)
+                cancel_percent = self._progress_map[index].percent if index in self._progress_map else 0
+                self._progress_map[index] = TaskProgress(
+                    file_index=index,
+                    file_name=file_item.name,
+                    status="cancelled",
+                    percent=cancel_percent,
+                )
+                self._emit("task_progress", {
+                    "file_index": index,
+                    "file_name": file_item.name,
+                    "percent": cancel_percent,
+                    "status": "cancelled",
+                })
             else:
                 logger.error("[_run_task] Task {} failed, emitting task_error: {}", index, error)
                 self._progress_map[index] = TaskProgress(
@@ -214,7 +241,7 @@ class BatchRunner:
 
             with threading.Lock():
                 self._completed += 1
-                if not success:
+                if not success and not self._cancel_event.is_set():
                     self._errors += 1
 
                 overall = self._completed / self._total * 100 if self._total > 0 else 100
@@ -242,18 +269,29 @@ class BatchRunner:
                             logger.exception("Unexpected error in task: {}", exc)
             finally:
                 self._running = False
+                cancelled = self._total - self._completed
                 logger.info(
-                    "Batch complete: {}/{} done, {} errors",
+                    "Batch complete: {}/{} done, {} errors, {} cancelled",
                     self._completed - self._errors,
                     self._total,
                     self._errors,
+                    cancelled,
                 )
-                logger.info("[BatchRunner] Emitting batch_complete: total={} completed={} errors={}", self._total, self._completed, self._errors)
-                self._emit("batch_complete", {
-                    "total": self._total,
-                    "completed": self._completed,
-                    "errors": self._errors,
-                })
+                if self._cancel_event.is_set():
+                    logger.info("[BatchRunner] Emitting batch_cancelled: total={} completed={} errors={} cancelled={}", self._total, self._completed, self._errors, cancelled)
+                    self._emit("batch_cancelled", {
+                        "total": self._total,
+                        "completed": self._completed,
+                        "errors": self._errors,
+                        "cancelled": cancelled,
+                    })
+                else:
+                    logger.info("[BatchRunner] Emitting batch_complete: total={} completed={} errors={}", self._total, self._completed, self._errors)
+                    self._emit("batch_complete", {
+                        "total": self._total,
+                        "completed": self._completed,
+                        "errors": self._errors,
+                    })
 
         thread = threading.Thread(target=_run_all, daemon=True)
         thread.start()
@@ -261,3 +299,11 @@ class BatchRunner:
     def cancel(self) -> None:
         logger.info("Batch cancel requested")
         self._cancel_event.set()
+        with self._procs_lock:
+            for idx, proc in list(self._running_procs.items()):
+                try:
+                    proc.kill()
+                    logger.info("Killed ffmpeg process for task {}", idx)
+                except Exception as exc:
+                    logger.warning("Failed to kill process for task {}: {}", idx, exc)
+            self._running_procs.clear()

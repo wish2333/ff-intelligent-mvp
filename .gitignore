@@ -165,14 +165,19 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# bun
+# bun/node
 node_modules/
 bun.lock
+package-lock.json
 
 # Claude Code
-runCC-GLM.bat
-runCC-OR.bat
-runCC-DS.bat
+runCC-GLM.*
+runCC-OR.*
+runCC-DS.*
+.claude/settings.local.json
+
+# Mac OS
+.DS_Store
 
 # Build
 frontend_dist/

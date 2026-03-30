@@ -11,6 +11,8 @@ export interface TaskProgressData {
   output_path?: string;
   speed?: string;
   fps?: string;
+  current_seconds?: number;
+  total_duration_seconds?: number;
 }
 
 export function useBatchProcess() {
@@ -19,7 +21,6 @@ export function useBatchProcess() {
   const overallTotal = ref(0);
   const overallCompleted = ref(0);
   const taskProgressMap = ref<Record<number, TaskProgressData>>({});
-  const logLines = ref<string[]>([]);
   const cleanups: (() => void)[] = [];
 
   // Method to manually set processing state (fallback if event is missed)
@@ -48,7 +49,7 @@ export function useBatchProcess() {
           overallProgress.value = data.overall_percent;
         },
       ),
-      onEvent<{ file_index: number; file_name: string; percent: number; time_str: string; speed: string; fps: string }>(
+      onEvent<{ file_index: number; file_name: string; percent: number; time_str: string; speed: string; fps: string; current_seconds: number; total_duration_seconds: number }>(
         "task_progress",
         (data) => {
           console.log("[useBatchProcess] task_progress received:", data);
@@ -60,6 +61,8 @@ export function useBatchProcess() {
             status: "running",
             speed: data.speed,
             fps: data.fps,
+            current_seconds: data.current_seconds,
+            total_duration_seconds: data.total_duration_seconds,
           };
           taskProgressMap.value = { ...taskProgressMap.value };
         },
@@ -78,6 +81,8 @@ export function useBatchProcess() {
             output_path: data.output_path,
             speed: existing?.speed ?? "",
             fps: existing?.fps ?? "",
+            current_seconds: existing?.total_duration_seconds,
+            total_duration_seconds: existing?.total_duration_seconds,
           };
           taskProgressMap.value = { ...taskProgressMap.value };
         },
@@ -100,20 +105,29 @@ export function useBatchProcess() {
           taskProgressMap.value = { ...taskProgressMap.value };
         },
       ),
-      onEvent<{ line: string }>(
-        "log_line",
-        (data) => {
-          logLines.value.push(data.line);
-          if (logLines.value.length > 200) {
-            logLines.value = logLines.value.slice(-200);
-          }
-        },
-      ),
       onEvent<{ total: number; completed: number; errors: number }>(
         "batch_complete",
         (data) => {
           console.log("[useBatchProcess] batch_complete received:", data);
           processing.value = false;
+        },
+      ),
+      onEvent<{ total: number; completed: number; errors: number; cancelled: number }>(
+        "batch_cancelled",
+        (data) => {
+          console.log("[useBatchProcess] batch_cancelled received:", data);
+          processing.value = false;
+          overallTotal.value = 0;
+          overallCompleted.value = 0;
+          overallProgress.value = 0;
+          // Update all running tasks to cancelled
+          for (const key in taskProgressMap.value) {
+            const task = taskProgressMap.value[key];
+            if (task.status === "running") {
+              taskProgressMap.value[key] = { ...task, status: "cancelled" };
+            }
+          }
+          taskProgressMap.value = { ...taskProgressMap.value };
         },
       ),
     );
@@ -131,7 +145,6 @@ export function useBatchProcess() {
     overallTotal.value = 0;
     overallCompleted.value = 0;
     taskProgressMap.value = {};
-    logLines.value = [];
   }
 
   return {
@@ -140,7 +153,6 @@ export function useBatchProcess() {
     overallTotal,
     overallCompleted,
     taskProgressMap,
-    logLines,
     reset,
     setProcessing,
   };
