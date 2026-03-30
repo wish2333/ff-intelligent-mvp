@@ -58,6 +58,8 @@ uv run build.py --android
 uv run build.py --clean
 ```
 
+构建时会自动下载对应平台的 FFmpeg 二进制并打包进产物，无需用户手动安装。
+
 ## 内置预设
 
 | 预设 | 说明 |
