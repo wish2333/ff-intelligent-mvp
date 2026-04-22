@@ -1154,9 +1154,9 @@ class ValidationContext:
 
 ### Phase 1 测试
 
-- [ ] 应用启动，三个页面可通过导航栏切换
-- [ ] Hash URL 在 pywebview 中正常工作
-- [ ] 直接输入 hash URL 可跳转到对应页面
+- [x] 应用启动，三个页面可通过导航栏切换
+- [x] Hash URL 在 pywebview 中正常工作
+- [x] 直接输入 hash URL 可跳转到对应页面
 
 ### Phase 2 测试
 

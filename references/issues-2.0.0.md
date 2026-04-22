@@ -124,3 +124,53 @@ docs\PRD-2.0.0.md
        #774  2:44 PM  ✅  Annotated Bridge API methods with 1.x version origin in section 6.3
 ```
 
+### Phase 1
+
+```
+  Phase 1: Foundation Layer - Complete
+
+  What was built
+
+  ┌─────┬───────────────────────────────────────────────────────────────────────────────────────────────────┬────────┐
+  │  #  │                                              Content                                              │ Status │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 1   │ vue-router dependency installed via bun                                                           │ Done   │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 2   │ core/models.py - All 2.0 data models (TaskState, TranscodeConfig, FilterConfig, TaskConfig,       │ Done   │
+  │     │ TaskProgress, Task, Preset, AppSettings) with state machine validation and JSON serialization     │        │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 3   │ core/config.py - AppSettings load/save to %APPDATA%/ff-intelligent-neo/settings.json              │ Done   │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 4   │ frontend/src/types/*.ts - 4 DTO type definition files (task, config, preset, settings)            │ Done   │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 5   │ frontend/src/composables/useBridge.ts - Event listener lifecycle management with auto-cleanup     │ Done   │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 6   │ frontend/src/router.ts + main.ts updated with hash-mode router                                    │ Done   │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 7   │ frontend/src/components/layout/AppNavbar.vue - Nav with page tabs + FFmpeg status                 │ Done   │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 8   │ 3 page placeholders (TaskQueue, CommandConfig, Settings)                                          │ Done   │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 9   │ App.vue rewritten as AppNavbar + router-view                                                      │ Done   │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 10  │ bridge.ts already had unified format, kept as-is                                                  │ Done   │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────────────────────┼────────┤
+  │ 11  │ Removed 11 old 1.x components/composables, simplified main.py to stubs                            │ Done   │
+  └─────┴───────────────────────────────────────────────────────────────────────────────────────────────────┴────────┘
+
+  Verification
+
+  - TypeScript: zero errors
+  - Vite build: succeeds (806ms)
+  - Python imports: all OK
+
+  Manual Testing Checklist
+
+  1. Run uv run main.py and verify the app window opens with "FF Intelligent Neo" title
+  2. Verify the navbar shows 3 navigation tabs: "Task Queue", "Command Config", "Settings"
+  3. Click each tab - verify the URL changes to #/task-queue, #/command-config, #/settings
+  4. Verify each page shows its placeholder text
+  5. Verify FFmpeg status badge appears in the navbar (green/red based on FFmpeg availability)
+  6. Verify the / route redirects to #/task-queue
+```
+
