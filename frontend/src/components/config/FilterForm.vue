@@ -6,6 +6,7 @@
  */
 
 import type { FilterConfigDTO } from "../../types/config"
+import FileDropInput from "../common/FileDropInput.vue"
 
 defineProps<{
   config: FilterConfigDTO
@@ -74,13 +75,13 @@ const WATERMARK_POSITIONS = [
       <!-- Watermark Path -->
       <div class="form-control mb-3">
         <label class="label py-1">
-          <span class="label-text text-xs">Watermark Image Path</span>
+          <span class="label-text text-xs">Watermark Image</span>
         </label>
-        <input
-          v-model="config.watermark_path"
-          type="text"
-          placeholder="Absolute path to watermark image"
-          class="input input-bordered input-sm w-full"
+        <FileDropInput
+          :model-value="config.watermark_path"
+          accept=".png,.jpg,.jpeg,.bmp,.webp"
+          placeholder="Drop image here or click to select"
+          @update:model-value="config.watermark_path = $event"
         />
       </div>
 

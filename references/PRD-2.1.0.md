@@ -680,6 +680,11 @@ export default {
 | 4.2 | 英文语言包翻译 | - |
 | 4.3 | 语言切换 UI | docs/fields/AppSettings.csv |
 
+Phase4补充任务：
+
+- FFmpeg下载按钮：由于static-ffmepg只在win有二进制文件下载，所以下载按钮只在win显示，其他平台替换为显示对应下载提示，如mac显示可通过homebrew安装
+- 软件相关持久化配置和日志文件全部保存到：软件目录\data\ 中
+
 ---
 
 ## 附录 A: 文档变更追踪
@@ -688,11 +693,43 @@ export default {
 
 ### A.1 docs/StateMachine.md 变更
 
-**变更内容**：新增 Reset 状态转移
+**状态**: Phase 2 已同步 (2.1.0-CHANGE 标记: 行1-行14, 行56-行82, 行87-行115)
+
+**变更内容**：完整状态机文档（新建）+ Reset 状态转移
 
 ```markdown
-<!-- v2.1.0-CHANGE: 新增 Reset 转移 -->
-在"恢复状态转移"章节后新增：
+## 状态定义
+
+| 状态 | 说明 | 终态 |
+|------|------|------|
+| pending | 任务已创建，等待执行 | 否 |
+| running | 任务正在执行中 | 否 |
+| paused | 任务已暂停 | 否 |
+| completed | 任务执行成功 | 是 |
+| failed | 任务执行失败 | 否（可 Retry） |
+| cancelled | 任务被用户取消 | 是 |
+
+## 合法状态转移
+
+| 当前状态 | 可转移至 | 触发方式 | 前端 API |
+|---------|---------|---------|---------|
+| pending | running, cancelled | Start / Stop | start_task / stop_task |
+| running | paused, completed, failed, cancelled | Pause / FFmpeg退出 / Stop | pause_task / 后端自动 / stop_task |
+| paused | running, cancelled | Resume / Stop | resume_task / stop_task |
+| failed | pending | Retry | retry_task |
+| completed | pending | Reset | reset_task |
+| cancelled | pending | Reset | reset_task |
+
+## 按钮映射
+
+| 状态 | 显示按钮 | 样式 |
+|------|---------|------|
+| pending | Start, MoveUp, MoveDown | btn-primary, btn-ghost |
+| running | Pause, Stop, Log | btn-warning-outline, btn-error-outline, btn-ghost |
+| paused | Resume, Stop, Log | btn-info-outline, btn-error-outline, btn-ghost |
+| completed | Reset | btn-info |
+| failed | Retry, Log | btn-warning, btn-ghost |
+| cancelled | Reset | btn-info |
 
 ## Reset 状态转移
 
@@ -705,50 +742,173 @@ completed 和 cancelled 为终态的任务可通过用户操作重置为 pending
 | completed -> pending | 点击 Reset | `reset_task(id)` | 清除日志、输出路径、错误信息，重置进度 |
 | cancelled -> pending | 点击 Reset | `reset_task(id)` | 同上 |
 
-### 按钮映射变更
+### Reset vs Retry 区别
 
-| 状态 | 变更前 | 变更后 |
-|------|--------|--------|
-| completed | (无) | Reset |
-| cancelled | (无) | Reset |
+| 维度 | Reset | Retry |
+|------|-------|-------|
+| 适用状态 | completed, cancelled | failed |
+| 保留日志 | 否（清空） | 是（保留） |
+
+## 日志可见性规则
+
+| 状态 | Log 按钮 | 说明 |
+|------|---------|------|
+| running | 显示 | 实时日志 |
+| paused | 显示 | 暂停前日志 |
+| failed | 显示 | 保留完整错误日志 |
+| completed | 隐藏 | |
+| cancelled | 隐藏 | |
 ```
 
 ### A.2 docs/BusinessRules.md 变更
 
-**变更内容**：
-1. 新增参数验证规则（编码器、滤镜、剪辑、音频字幕）
-2. 日志生命周期规则
-3. FFmpeg 路径检测优先级规则
-4. Download FFmpeg 二次确认规则
+**状态**: Phase 2 已同步 (2.1.0-CHANGE 标记: 行5-行30, 行35-行50, 行55-行68, 行73-行88, 行93-行108, 行113-行130)
+
+**变更内容**：6 个业务规则章节（新建）
+
+```markdown
+## 日志生命周期规则
+
+| 场景 | 行为 |
+|------|------|
+| running | 日志实时写入 log_lines，Log 按钮可查看 |
+| failed | 日志保留不清除，Log 按钮持续可查看 |
+| completed | 日志保留，Log 按钮隐藏 |
+| cancelled | 日志保留，Log 按钮隐藏 |
+| Reset (completed/cancelled) | 清空 log_lines, error, output_path, progress, 时间戳 |
+| Retry (failed) | 日志保留，不清除 |
+容量：每个任务最多 100 行，仅内存维护不持久化
+
+## Download FFmpeg 二次确认规则
+
+- 按钮始终可见，不受 FFmpeg 状态影响
+- 点击弹出 DaisyUI modal 确认对话框
+- 确认后触发 download 事件，下载中显示 spinner 并禁用
+- detecting 状态时按钮禁用
+
+## FFmpeg 版本切换事件规则
+
+- 事件名: ffmpeg_version_changed
+- 触发时机: switch_ffmpeg 成功后
+- 数据: { version, path, status: "ready" }
+- 监听: AppNavbar.vue 通过 onEvent 监听并更新状态徽标
+
+## Reset 行为规则
+
+- 仅 completed/cancelled 可 Reset，目标 pending
+- 清空: error, log_lines, output_path, progress, started_at, completed_at
+- 保留: id, file_path, file_name, file_size_bytes, duration_seconds, config
+- 不自动开始，需手动 Start
+
+## 主题切换规则
+
+- 支持: auto/light/dark
+- 通过 data-theme 属性切换 DaisyUI 主题
+- 持久化到 settings.json 的 theme 字段
+- auto 模式监听 matchMedia change 事件
+
+## 文件拖拽输入规则
+
+- 组件: FileDropInput.vue (common/)
+- 输入: 拖拽 或 点击打开文件选择器
+- 前端扩展名验证 (accept prop)
+- drop 后 80ms 延迟调用 get_dropped_files
+- 显示文件名，悬停显示完整路径，支持清除
+```
 
 ### A.3 docs/fields/ 变更
 
-**新增文件**：
+**状态**: Phase 2 已同步
+
+**已修改文件**：
+
+| 文件 | 变更内容 |
+|------|---------|
+| `docs/fields/Task.csv` | log_lines 补充 Reset/Retry 行为说明；error 补充 Reset 清理说明；started_at/completed_at 补充 Reset 清理说明 |
+| `docs/fields/AppSettings.csv` | 新增 `theme` 字段（str, default="auto", auto/light/dark） |
+| `docs/fields/FilterConfig.csv` | watermark_path 补充 FileDropInput.vue 组件输入方式说明 |
+
+**待新增文件（Phase 3）**：
 - `docs/fields/Encoder.csv` - 编码器配置
 - `docs/fields/MergeConfig.csv` - 拼接配置
 - `docs/fields/ClipConfig.csv` - 剪辑配置
 - `docs/fields/AudioSubtitleConfig.csv` - 音频字幕配置
 
-**修改文件**：
-- `docs/fields/FilterConfig.csv` - 新增音频归一化、横竖屏转换字段
+**待修改文件（Phase 3）**：
+- `docs/fields/FilterConfig.csv` - 新增 audio_normalize, target_loudness, true_peak, lra, aspect_convert, target_resolution, bg_image_path
 - `docs/fields/TranscodeConfig.csv` - 扩展编码器列表
-- `docs/fields/AppSettings.csv` - 新增 theme、language 字段
-- `docs/fields/Task.csv` - 新增 Reset 相关行为说明
+- `docs/fields/AppSettings.csv` - 新增 language 字段
 
 ### A.4 docs/Structure.md 变更
 
-**变更内容**：
-1. 新增 FileDropInput.vue 组件
-2. 新增 i18n 目录结构
-3. 更新 command_builder.py 模块职责描述
-4. 新增 MultiFileMerge 页面描述（如为独立页面）
+**状态**: Phase 2 已同步 (2.1.0-CHANGE 标记: FileDropInput, useTheme, useTaskControl, 事件系统)
+
+**变更内容**：完整架构文档（新建）
+
+```markdown
+## 通用组件
+
+### FileDropInput.vue
+路径: frontend/src/components/common/FileDropInput.vue
+Props: modelValue(string), accept(string?), placeholder(string?)
+Events: update:modelValue
+行为: 拖拽高亮、dragCounter 冒泡处理、80ms drop 延迟、
+     select_file_filtered 后端 API、文件名显示+悬停全路径、清除按钮
+使用: FilterForm.vue 水印路径 (accept: .png,.jpg,.jpeg,.bmp,.webp)
+
+## Composables
+
+### useTheme.ts (新增)
+路径: frontend/src/composables/useTheme.ts
+类型: ThemeValue = "auto" | "light" | "dark"
+返回: currentTheme, setTheme, toggleTheme, resolveTheme
+行为: data-theme 属性切换、auto 模式 matchMedia 监听、save_settings 持久化
+
+### useTaskControl.ts (更新)
+新增方法: resetTask(taskId) -> 调用后端 reset_task
+
+## Bridge API - 事件系统
+
+### ffmpeg_version_changed (新增)
+数据: { version, path, status }
+触发: main.py switch_ffmpeg 成功后
+监听: AppNavbar.vue 更新状态徽标
+```
+
+**待变更（Phase 3/4）**：
+1. 新增 i18n 目录结构
+2. 更新 command_builder.py 模块职责描述
+3. 新增 MultiFileMerge 页面描述（如为独立页面）
 
 ### A.5 docs/Procedure.md 变更
 
-**变更内容**：
-1. 更新 FFmpeg 初始化流程（增加本地文件夹检测）
-2. 更新进程控制流程（跨平台兼容）
-3. 新增硬件编码器检测流程
+**状态**: Phase 2 已同步 (2.1.0-CHANGE 标记: 行3-行25, 行30-行55, 行60-行82, 行87-行105)
+
+**变更内容**：4 个业务流程时序图（新建）
+
+```markdown
+## FFmpeg 版本切换流程
+User -> Settings -> main.py -> ffmpeg_setup.py
+main.py _emit("ffmpeg_version_changed") -> AppNavbar.vue 更新徽标
+
+## 任务 Reset 流程
+User -> TaskRow -> useTaskControl -> main.py -> task_runner
+task_runner 校验状态 -> 清空运行时数据 -> transition_task(pending)
+_emit("task_state_changed") + _emit("queue_changed")
+
+## Download FFmpeg 流程
+点击按钮 -> 弹出 DaisyUI modal -> 确认 -> emit("download")
+-> 父组件调用 download_ffmpeg() -> 5秒后恢复 loading
+
+## 主题切换流程
+点击太阳/月亮 -> toggleTheme() -> resolveTheme -> setAttribute("data-theme")
+-> save_settings({ theme }) (异步, 失败不影响本地)
+```
+
+**待变更（Phase 1/3）**：
+1. FFmpeg 初始化流程（增加本地文件夹检测）
+2. 进程控制流程（跨平台兼容）
+3. 硬件编码器检测流程
 
 ---
 

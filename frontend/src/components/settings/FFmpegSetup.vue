@@ -5,7 +5,7 @@
  * Shows current FFmpeg status, version list for switching,
  * auto-detect and manual select buttons.
  */
-import { computed } from "vue"
+import { ref, computed } from "vue"
 import type { FfmpegVersionDTO } from "../../composables/useSettings"
 
 const props = defineProps<{
@@ -21,6 +21,9 @@ const emit = defineEmits<{
   download: []
 }>()
 
+const showConfirm = ref(false)
+const isDownloading = ref(false)
+
 const statusBadge = computed(() => {
   switch (props.status) {
     case "ready":
@@ -31,6 +34,19 @@ const statusBadge = computed(() => {
       return { class: "badge-warning", text: "Detecting..." }
   }
 })
+
+async function confirmDownload(): Promise<void> {
+  showConfirm.value = false
+  isDownloading.value = true
+  try {
+    emit("download")
+  } finally {
+    // Reset loading state after a delay (download is async via parent)
+    setTimeout(() => {
+      isDownloading.value = false
+    }, 5000)
+  }
+}
 </script>
 
 <template>
@@ -63,10 +79,11 @@ const statusBadge = computed(() => {
         Select...
       </button>
       <button
-        v-if="versions.length === 0 && status !== 'detecting'"
         class="btn btn-xs btn-accent btn-outline"
-        @click="emit('download')"
+        :disabled="status === 'detecting' || isDownloading"
+        @click="showConfirm = true"
       >
+        <span v-if="isDownloading" class="loading loading-spinner loading-xs" />
         Download FFmpeg
       </button>
     </div>
@@ -96,7 +113,7 @@ const statusBadge = computed(() => {
               {{ ver.source }}
             </span>
             <span class="text-sm font-medium">
-              FFmpeg {{ ver.version }}
+              FFmpeg <template v-if="ver.version">v{{ ver.version }}</template>
             </span>
           </div>
           <p class="text-xs opacity-50 truncate" :title="ver.path">
@@ -109,5 +126,20 @@ const statusBadge = computed(() => {
     <p v-else-if="status !== 'detecting'" class="text-xs opacity-40">
       No FFmpeg versions found. Click "Auto Detect" or "Select..." to set up FFmpeg.
     </p>
+
+    <!-- Download confirmation modal -->
+    <dialog class="modal" :class="{ 'modal-open': showConfirm }">
+      <div class="modal-box">
+        <h3 class="text-lg font-bold">Confirm Download</h3>
+        <p class="py-4">This will download FFmpeg and overwrite the current version. Continue?</p>
+        <div class="modal-action">
+          <button class="btn btn-sm btn-ghost" @click="showConfirm = false">Cancel</button>
+          <button class="btn btn-sm btn-accent" @click="confirmDownload">Confirm</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="showConfirm = false">close</button>
+      </form>
+    </dialog>
   </div>
 </template>

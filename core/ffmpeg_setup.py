@@ -125,6 +125,25 @@ def _find_local_ffmpeg_bin(name: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def _remove_static_ffmpeg_from_path() -> None:
+    """Temporarily remove static_ffmpeg directories from PATH.
+
+    This prevents static_ffmpeg binaries from shadowing system-installed
+    FFmpeg when discovering versions.
+    """
+    try:
+        import static_ffmpeg
+
+        pkg_dir = os.path.normpath(Path(static_ffmpeg.__file__).parent)
+        current = os.environ.get("PATH", "")
+        entries = current.split(os.pathsep)
+        filtered = [e for e in entries if os.path.normpath(e) != pkg_dir
+                    and not os.path.normpath(e).startswith(pkg_dir + os.sep)]
+        os.environ["PATH"] = os.pathsep.join(filtered)
+    except ImportError:
+        pass
+
+
 def _find_static_ffmpeg_bin(name: str) -> str | None:
     """Locate a binary from the static_ffmpeg package directory."""
     try:
@@ -303,7 +322,15 @@ def get_ffprobe_path() -> str | None:
 
 
 def discover_ffmpeg_versions() -> list[dict]:
-    """Discover all available FFmpeg installations.
+    """Discover available FFmpeg installations.
+
+    Search scope (in order):
+      1. User-specified path (from settings)
+      2. Local ``./ffmpeg/`` directory
+      3. Platform-known paths (macOS/Linux only, ``is_file`` check)
+      4. System PATH (``shutil.which``)
+      5. ``static_ffmpeg`` package directory (Windows only)
+      6. Bundled binary (PyInstaller frozen only)
 
     Returns a list of dicts:
     ``{"path": str, "version": str, "source": str, "active": bool}``
@@ -320,13 +347,16 @@ def discover_ffmpeg_versions() -> list[dict]:
         if not path or path in seen_paths:
             return
         seen_paths.add(path)
-        version = _get_version_string(path)
+        is_active = (
+            os.path.normpath(path) == os.path.normpath(current_path)
+            if current_path else False
+        )
+        version = _get_version_string(path) if is_active else ""
         versions.append({
             "path": path,
-            "version": version or "unknown",
+            "version": version,
             "source": source,
-            "active": os.path.normpath(path) == os.path.normpath(current_path)
-            if current_path else False,
+            "active": is_active,
         })
 
     # 1. User-specified
@@ -335,30 +365,31 @@ def discover_ffmpeg_versions() -> list[dict]:
         if user_ff:
             _add(user_ff, "User")
 
-    # 2. Bundled
-    bundled = _find_bundled_bin("ffmpeg")
-    if bundled:
-        _add(bundled, "Bundled")
-
-    # 3. Local ./ffmpeg/ folder
+    # 2. Local ./ffmpeg/ folder
     local_path = _find_local_ffmpeg_bin("ffmpeg")
     if local_path:
         _add(local_path, "Local")
 
-    # 4. Platform paths
+    # 3. Platform-known paths (only checks paths for the current OS)
     platform_path = _find_platform_bin("ffmpeg")
     if platform_path:
         _add(platform_path, "System")
 
-    # 5. PATH
+    # 4. System PATH
     path_ff = shutil.which("ffmpeg")
     if path_ff:
         _add(path_ff, "PATH")
 
-    # 6. static_ffmpeg
-    static_ff = _find_static_ffmpeg_bin("ffmpeg")
-    if static_ff:
-        _add(static_ff, "Static FFmpeg")
+    # 5. static_ffmpeg (Windows only)
+    if sys.platform == "win32":
+        static_ff = _find_static_ffmpeg_bin("ffmpeg")
+        if static_ff:
+            _add(static_ff, "Static FFmpeg")
+
+    # 6. Bundled (PyInstaller only)
+    bundled = _find_bundled_bin("ffmpeg")
+    if bundled:
+        _add(bundled, "Bundled")
 
     return versions
 

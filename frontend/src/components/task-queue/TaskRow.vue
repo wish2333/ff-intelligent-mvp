@@ -23,6 +23,7 @@ const emit = defineEmits<{
   pause: [taskId: string]
   resume: [taskId: string]
   retry: [taskId: string]
+  reset: [taskId: string]
   moveUp: [taskId: string]
   moveDown: [taskId: string]
   showLog: [taskId: string]
@@ -155,6 +156,15 @@ const stateLabel: Record<string, string> = {
           Retry
         </button>
 
+        <!-- Completed/Cancelled: Reset -->
+        <button
+          v-if="task.state === 'completed' || task.state === 'cancelled'"
+          class="btn btn-xs btn-info"
+          @click="emit('reset', task.id)"
+        >
+          Reset
+        </button>
+
         <!-- Running: Pause + Stop -->
         <template v-if="task.state === 'running'">
           <button
@@ -187,9 +197,9 @@ const stateLabel: Record<string, string> = {
           </button>
         </template>
 
-        <!-- Log toggle -->
+        <!-- Log toggle: only for states that retain logs -->
         <button
-          v-if="task.state === 'running' || task.state === 'failed' || task.state === 'paused' || task.state === 'cancelled' || (task.log_lines && task.log_lines.length > 0)"
+          v-if="task.state === 'running' || task.state === 'failed' || task.state === 'paused'"
           class="btn btn-xs btn-ghost"
           @click="emit('showLog', task.id)"
         >

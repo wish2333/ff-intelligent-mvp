@@ -75,11 +75,16 @@ async function handleDrop(): Promise<void> {
   }
 }
 
+function currentConfig() {
+  return globalConfig.toTaskConfig()
+}
+
 async function handleStartAllPending(): Promise<void> {
   try {
     const pending = queue.pendingTasks.value
+    const cfg = currentConfig()
     for (const task of pending) {
-      await control.startTask(task.id)
+      await control.startTask(task.id, cfg)
     }
   } catch (err) {
     console.error("[TaskQueuePage] handleStartAllPending error:", err)
@@ -174,11 +179,12 @@ async function handleMoveDown(taskId: string): Promise<void> {
       :progress-map="progress.progressMap.value"
       :active-log-task-id="activeLogTaskId"
       @toggle-select="queue.toggleSelect"
-      @start="control.startTask"
+      @start="(id: string) => control.startTask(id, currentConfig())"
       @stop="control.stopTask"
       @pause="control.pauseTask"
       @resume="control.resumeTask"
-      @retry="control.retryTask"
+      @retry="(id: string) => control.retryTask(id, currentConfig())"
+      @reset="control.resetTask"
       @move-up="handleMoveUp"
       @move-down="handleMoveDown"
       @show-log="handleToggleLog"

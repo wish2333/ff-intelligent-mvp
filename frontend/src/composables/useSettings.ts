@@ -33,6 +33,7 @@ export function useSettings() {
     default_output_dir: "",
     ffmpeg_path: "",
     ffprobe_path: "",
+    theme: "auto",
   })
 
   const ffmpegVersions = ref<FfmpegVersionDTO[]>([])

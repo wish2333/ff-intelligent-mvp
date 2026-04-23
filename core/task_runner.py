@@ -76,12 +76,17 @@ class TaskRunner:
     # Single-task control
     # ------------------------------------------------------------------
 
-    def start_task(self, task_id: str) -> bool:
+    def start_task(self, task_id: str, config: dict | None = None) -> bool:
         """Submit a pending task for execution.
+
+        If *config* is provided, it updates ``task.config`` before building
+        the command so the latest UI settings are always used.
 
         Returns ``True`` if the task was submitted, ``False`` otherwise
         (e.g. wrong state, not found).
         """
+        from core.models import TaskConfig
+
         task = self._queue.get_task(task_id)
         if task is None:
             logger.warning("start_task: task {} not found", task_id)
@@ -91,6 +96,10 @@ class TaskRunner:
                 "start_task: invalid transition {} -> running", task.state
             )
             return False
+
+        # Apply latest config from frontend if provided
+        if config is not None:
+            task.config = TaskConfig.from_dict(config)
 
         ffmpeg_path = get_ffmpeg_path()
         ffprobe_path = get_ffprobe_path()
@@ -278,13 +287,16 @@ class TaskRunner:
         logger.info("Task {} resumed", task_id)
         return True
 
-    def retry_task(self, task_id: str) -> bool:
-        """Reset a failed task to pending and re-execute it."""
+    def retry_task(self, task_id: str, config: dict | None = None) -> bool:
+        """Reset a failed task to pending and re-execute it.
+
+        Keeps log_lines intact so the user can review previous failure logs.
+        """
         task = self._queue.get_task(task_id)
         if task is None or task.state != "failed":
             return False
 
-        # Clear error and reset progress
+        # Clear error and reset progress but keep log_lines
         task.error = ""
         task.progress = TaskProgress()
         task.output_path = ""
@@ -299,8 +311,35 @@ class TaskRunner:
         })
         self._emit("queue_changed", self._queue.get_summary())
 
-        # Re-submit for execution
-        return self.start_task(task_id)
+        # Re-submit for execution with latest config
+        return self.start_task(task_id, config=config)
+
+    def reset_task(self, task_id: str) -> bool:
+        """Reset a completed or cancelled task to pending for re-execution.
+
+        Clears log_lines, output_path, error, progress, and timestamps.
+        Does NOT auto-start the task.
+        """
+        task = self._queue.get_task(task_id)
+        if task is None or task.state not in ("completed", "cancelled"):
+            return False
+
+        # Clear all runtime data
+        task.error = ""
+        task.progress = TaskProgress()
+        task.output_path = ""
+        task.log_lines = []
+        task.started_at = ""
+        task.completed_at = ""
+
+        old_state = self._queue.transition_task(task_id, "pending")
+        self._emit("task_state_changed", {
+            "task_id": task_id,
+            "old_state": old_state or task.state,
+            "new_state": "pending",
+        })
+        self._emit("queue_changed", self._queue.get_summary())
+        return True
 
     # ------------------------------------------------------------------
     # Bulk control

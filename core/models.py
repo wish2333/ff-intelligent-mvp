@@ -16,8 +16,8 @@ VALID_TRANSITIONS: dict[TaskState, set[TaskState]] = {
     "running": {"paused", "completed", "failed", "cancelled"},
     "paused": {"running", "cancelled"},
     "failed": {"pending"},
-    "completed": set(),
-    "cancelled": set(),
+    "completed": {"pending"},
+    "cancelled": {"pending"},
 }
 
 
@@ -316,6 +316,7 @@ class AppSettings:
     default_output_dir: str = ""
     ffmpeg_path: str = ""
     ffprobe_path: str = ""
+    theme: str = "auto"
 
     def to_dict(self) -> dict:
         return {
@@ -323,6 +324,7 @@ class AppSettings:
             "default_output_dir": self.default_output_dir,
             "ffmpeg_path": self.ffmpeg_path,
             "ffprobe_path": self.ffprobe_path,
+            "theme": self.theme,
         }
 
     @classmethod
@@ -332,4 +334,5 @@ class AppSettings:
             default_output_dir=data.get("default_output_dir", ""),
             ffmpeg_path=data.get("ffmpeg_path", ""),
             ffprobe_path=data.get("ffprobe_path", ""),
+            theme=data.get("theme", "auto"),
         )

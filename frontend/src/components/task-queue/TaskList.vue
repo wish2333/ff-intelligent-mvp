@@ -19,6 +19,7 @@ const emit = defineEmits<{
   pause: [taskId: string]
   resume: [taskId: string]
   retry: [taskId: string]
+  reset: [taskId: string]
   moveUp: [taskId: string]
   moveDown: [taskId: string]
   showLog: [taskId: string]
@@ -55,6 +56,7 @@ const emit = defineEmits<{
           @pause="emit('pause', $event)"
           @resume="emit('resume', $event)"
           @retry="emit('retry', $event)"
+          @reset="emit('reset', $event)"
           @move-up="emit('moveUp', $event)"
           @move-down="emit('moveDown', $event)"
           :class="{ 'bg-base-300/20': activeLogTaskId === task.id }"

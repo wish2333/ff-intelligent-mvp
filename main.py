@@ -244,10 +244,10 @@ class FFmpegApi(Bridge):
     # ------------------------------------------------------------------
 
     @expose
-    def start_task(self, task_id: str) -> dict:
-        """Start executing a single pending task."""
+    def start_task(self, task_id: str, config: dict | None = None) -> dict:
+        """Start executing a single pending task with the current config."""
         try:
-            ok = self._runner.start_task(task_id)
+            ok = self._runner.start_task(task_id, config=config)
             return {"success": ok, "data": None}
         except Exception as exc:
             logger.exception("start_task failed: {}", exc)
@@ -284,13 +284,42 @@ class FFmpegApi(Bridge):
             return {"success": False, "error": str(exc)}
 
     @expose
-    def retry_task(self, task_id: str) -> dict:
-        """Retry a failed task."""
+    def retry_task(self, task_id: str, config: dict | None = None) -> dict:
+        """Retry a failed task with the current config."""
         try:
-            ok = self._runner.retry_task(task_id)
+            ok = self._runner.retry_task(task_id, config=config)
             return {"success": ok, "data": None}
         except Exception as exc:
             logger.exception("retry_task failed: {}", exc)
+            return {"success": False, "error": str(exc)}
+
+    @expose
+    def reset_task(self, task_id: str) -> dict:
+        """Reset a completed or cancelled task to pending."""
+        try:
+            ok = self._runner.reset_task(task_id)
+            return {"success": ok, "data": None}
+        except Exception as exc:
+            logger.exception("reset_task failed: {}", exc)
+            return {"success": False, "error": str(exc)}
+
+    @expose
+    def fail_task(self, task_id: str) -> dict:
+        """Debug: force a running task to fail."""
+        try:
+            task = self._runner._queue.get_task(task_id)
+            if task is None or task.state != "running":
+                return {"success": False, "error": "Task not found or not running"}
+            task.error = "Simulated failure for testing"
+            self._runner._queue.transition_task(task_id, "failed")
+            self._runner._emit("task_state_changed", {
+                "task_id": task_id,
+                "old_state": "running",
+                "new_state": "failed",
+            })
+            self._runner._emit("queue_changed", self._runner._queue.get_summary())
+            return {"success": True, "data": None}
+        except Exception as exc:
             return {"success": False, "error": str(exc)}
 
     @expose
@@ -439,6 +468,11 @@ class FFmpegApi(Bridge):
         try:
             from core.ffmpeg_setup import switch_ffmpeg
             info = switch_ffmpeg(path)
+            self._emit("ffmpeg_version_changed", {
+                "version": info.get("version", ""),
+                "path": info.get("path", ""),
+                "status": "ready",
+            })
             return {"success": True, "data": info}
         except (ValueError, OSError) as exc:
             logger.exception("switch_ffmpeg failed: {}", exc)
@@ -447,6 +481,19 @@ class FFmpegApi(Bridge):
     @expose
     def select_ffmpeg_binary(self) -> dict:
         """Open file dialog to select an FFmpeg binary."""
+        try:
+            result = self._window.create_file_dialog(
+                dialog_type=webview.FileDialog.OPEN,
+            )
+            if result and len(result) > 0:
+                return {"success": True, "data": result[0]}
+            return {"success": True, "data": None}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @expose
+    def select_file_filtered(self, _file_types: str = "") -> dict:
+        """Open single-file dialog. Filtering is done on the frontend."""
         try:
             result = self._window.create_file_dialog(
                 dialog_type=webview.FileDialog.OPEN,

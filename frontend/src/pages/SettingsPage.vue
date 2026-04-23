@@ -3,8 +3,9 @@
  * Page 3: Software Settings
  *
  * FFmpeg setup, thread count, output folder, and app info.
+ * Settings are loaded async — page renders immediately, data fills in.
  */
-import { onMounted, ref, computed } from "vue"
+import { onMounted, computed } from "vue"
 import { waitForPyWebView } from "../bridge"
 import { useSettings } from "../composables/useSettings"
 
@@ -14,7 +15,6 @@ import OutputFolderInput from "../components/settings/OutputFolderInput.vue"
 import AppAbout from "../components/settings/AppAbout.vue"
 
 const s = useSettings()
-const isReady = ref(false)
 
 const currentVersion = computed(() => {
   const active = s.ffmpegVersions.value.find((v) => v.active)
@@ -24,15 +24,14 @@ const currentVersion = computed(() => {
 onMounted(async () => {
   try {
     await waitForPyWebView()
-    await Promise.all([
-      s.fetchSettings(),
-      s.fetchFfmpegVersions(),
-      s.fetchAppInfo(),
-    ])
+    // Fire-and-forget: page is already visible, data fills in as it arrives.
+    // fetchSettings is lightweight (file read); the other two may spawn
+    // ffmpeg subprocesses so they run concurrently without blocking the UI.
+    s.fetchSettings()
+    s.fetchFfmpegVersions()
+    s.fetchAppInfo()
   } catch (err) {
     console.error("[SettingsPage] mount failed:", err)
-  } finally {
-    isReady.value = true
   }
 })
 
@@ -47,12 +46,6 @@ async function handleOutputDirChange(value: string): Promise<void> {
 
 <template>
   <div class="flex flex-1 flex-col gap-4 p-4 overflow-auto">
-    <!-- Loading state -->
-    <div v-if="!isReady" class="flex flex-1 items-center justify-center">
-      <span class="loading loading-spinner loading-lg text-primary" />
-    </div>
-
-    <template v-else>
     <h1 class="text-2xl font-bold">Settings</h1>
 
     <div class="grid gap-4 lg:grid-cols-2">
@@ -99,6 +92,5 @@ async function handleOutputDirChange(value: string): Promise<void> {
         <AppAbout :info="s.appInfo.value" />
       </div>
     </div>
-    </template>
   </div>
 </template>

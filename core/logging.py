@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import sys
+from pathlib import Path
 
 from loguru import logger
 
@@ -15,6 +17,29 @@ logger.add(
     format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>",
     level="DEBUG",
 )
+
+
+def _ensure_log_dir() -> Path:
+    """Return (and create) the log directory under APPDATA."""
+    base = os.environ.get("APPDATA", "")
+    if not base:
+        base = os.path.expanduser("~")
+    log_dir = Path(base) / "ff-intelligent-neo" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir
+
+
+try:
+    _log_dir = _ensure_log_dir()
+    _file_sink_id = logger.add(
+        str(_log_dir / "app_{time:YYYY-MM-DD}.log"),
+        rotation="10 MB",
+        retention="7 days",
+        level="DEBUG",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+    )
+except Exception:
+    pass  # File logging is best-effort; console still works
 
 # Frontend sink placeholder - will be added when bridge is ready
 _frontend_sink_id: int | None = None
