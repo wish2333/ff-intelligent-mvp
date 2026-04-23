@@ -168,7 +168,12 @@ class TaskRunner:
         return True
 
     def pause_task(self, task_id: str) -> bool:
-        """Suspend a running task's FFmpeg process."""
+        """Suspend a running task's FFmpeg process.
+
+        If OS-level suspension fails (e.g. permission denied), falls back
+        to killing the process and marking the task as failed with the
+        current progress preserved so the user can retry.
+        """
         task = self._queue.get_task(task_id)
         if task is None or task.state != "running":
             return False
@@ -191,8 +196,32 @@ class TaskRunner:
                 suspend_process(proc.pid)
             except OSError as exc:
                 logger.warning(
-                    "pause_task: suspend failed (task {}): {}", task_id, exc
+                    "pause_task: suspend failed (task {}): {}, "
+                    "falling back to kill + preserve progress",
+                    task_id, exc,
                 )
+                # Degradation: kill the process and mark as failed
+                # Progress is preserved in the task for potential retry
+                kill_process_tree(proc.pid)
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    pass
+                self._running_procs.pop(task_id, None)
+                cancel_event = self._cancel_events.get(task_id)
+                if cancel_event:
+                    cancel_event.set()
+                with self._lock:
+                    self._cancel_events.pop(task_id, None)
+
+                old_state = self._queue.transition_task(task_id, "failed")
+                task.error = f"Suspend failed: {exc}"
+                self._emit("task_state_changed", {
+                    "task_id": task_id,
+                    "old_state": old_state or "running",
+                    "new_state": "failed",
+                })
+                self._emit("queue_changed", self._queue.get_summary())
                 return False
 
         old_state = self._queue.transition_task(task_id, "paused")

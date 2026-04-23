@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["pywebview>=6.0", "static-ffmpeg", "loguru>=0.7"]
-# ///
 """FF Intelligent Neo 2.0 - FFmpeg batch processing desktop tool."""
 
 from __future__ import annotations

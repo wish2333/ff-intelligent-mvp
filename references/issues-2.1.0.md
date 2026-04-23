@@ -167,3 +167,159 @@
 
 ## Phase1
 
+```
+  Phase 1 (多平台兼容性与基础修复) 实现完成。修改了 6 个文件：
+
+  变更清单
+
+  ┌─────────────────────────┬────────────────────────────────────────────────────────────────────────────────────────┐
+  │          文件           │                                          变更                                          │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ core/process_control.py │ CREATE_NO_WINDOW for taskkill; os.killpg + os.getpgid for Unix kill/suspend/resume     │
+  │                         │ targeting process groups; ProcessLookupError catch                                     │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ core/ffmpeg_runner.py   │ CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP on Windows Popen; start_new_session=True   │
+  │                         │ on Unix Popen; CREATE_NO_WINDOW for ffprobe duration probe                             │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │                         │ New _find_local_ffmpeg_bin() for ./ffmpeg/ folder; updated priority chain (user ->     │
+  │ core/ffmpeg_setup.py    │ bundled -> local -> platform -> PATH -> static); Linux paths in _find_platform_bin();  │
+  │                         │ CREATE_NO_WINDOW for version detection; skip local check when frozen                   │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ core/task_runner.py     │ pause_task degradation fallback: kill + mark failed with progress preserved when OS    │
+  │                         │ suspend fails; proper _cancel_events cleanup                                           │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ core/file_info.py       │ CREATE_NO_WINDOW for ffprobe probe; added sys import                                   │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────┤
+  │ core/app_info.py        │ CREATE_NO_WINDOW for version detection subprocess calls                                │
+  └─────────────────────────┴────────────────────────────────────────────────────────────────────────────────────────┘
+
+  手动测试项
+
+  1. Windows: 确认运行 FFmpeg 任务时不再弹出终端窗口
+  2. Windows: 确认设置页面 FFmpeg 版本切换不弹出终端
+  3. Windows: 确认任务暂停/恢复正常工作
+  4. Windows: 在应用同目录放置 ffmpeg/ffmpeg.exe，确认启动时自动检测
+  5. macOS: 确认 SIGSTOP/SIGCONT 正常暂停/恢复
+  6. Linux: 确认通过 apt/dnf/pacman 安装的 FFmpeg 可被检测
+  7. Linux: 确认 os.killpg 正确终止整个进程组
+  8. Linux: 测试权限不足时暂停降级（任务标记为 failed，进度保留）
+```
+
+### 新增需求
+
+- build.py打包时不默认自带FFmpeg二进制文件，可通过--with-ffmpeg参数传入打包时带上
+
+```
+  - build.py default build no longer downloads/bundles FFmpeg
+  - --with-ffmpeg flag triggers _pre_download_ffmpeg() which downloads binaries to ffmpeg_binaries/, and since both
+  app.spec and the onefile spec generator already conditionally include binaries based on file existence (if
+  _bin_path.exists()), the packaging logic needs no other changes
+  - Users get FFmpeg either from their system, local ./ffmpeg/ folder (Task 1.2), or the runtime download button in
+  Settings
+```
+
+### CC-Mem
+
+```
+     Legend: session-request | 🔴 bugfix | 🟣 feature | 🔄 refactor | ✅ change | 🔵 discovery | ⚖️ decision
+
+     Column Key
+       Read: Tokens to read this observation (cost to learn it now)
+       Work: Tokens spent on work that produced this record ( research, building, deciding)
+
+     Context Index: This semantic index (titles, types, files, tokens) is usually sufficient to understand past work.
+
+     When you need implementation details, rationale, or debugging context:
+       - Fetch by ID: get_observations([IDs]) for observations visible in this index
+       - Search history: Use the mem-search skill for past decisions, bugs, and deeper research
+       - Trust this index over re-reading code for past decisions and learnings
+
+     Context Economics
+       Loading: 50 observations (13,097 tokens to read)
+       Work investment: 0 tokens spent on research, building, and decisions
+
+     Apr 23, 2026
+
+     #S1 Audio transcoding parameter consistency fix - user requested explanation of changes made to ensure passed
+     parameters match command preview (Apr 23, 12:50 AM)
+
+     #S2 ComboInput component enhanced with improved filtering behavior (Apr 23, 12:54 AM)
+
+     General
+       #1347  7:08 PM  🔵  Phase 1 target identified in FFmpeg runner subprocess call
+       #1351  7:09 PM  🔵  Core module architecture comprises four specialized components
+       #1352           🔵  Core module implementation spans 1,128 lines across four files
+       #1353           🔵  Version detection subprocess also requires window suppression
+       #1354           🔵  Three additional subprocess locations require window suppression fixes
+       #1355           🔵  FFmpeg runner uses CREATE_NEW_PROCESS_GROUP for process isolation
+       #1356           🔵  Task runner orchestrates FFmpeg execution with process tracking
+       #1357  7:10 PM  🔵  Five subprocess.run locations identified requiring window suppression
+       #1358           🔵  Main.py orchestrates all bridge APIs for FFmpeg management
+       #1359           🔵  App_info.py subprocess.run lacks window suppression for version queries
+       #1360           🔵  File_info.py subprocess.run lacks window suppression for media probing
+       #1361           ⚖️  Phase 1 scope defined: Six subprocess locations require CREATE_NO_WINDOW fixes
+       #1362  7:11 PM  ⚖️  Phase 1 development plan comprises four tasks for Windows compatibility and cross-platform
+     improvements
+     core/ffmpeg_runner.py
+       #1363           🟣  FFmpeg runner subprocess now suppresses terminal windows on Windows
+       #1364           🟣  FFprobe duration query now suppresses terminal windows on Windows
+     General
+       #1365           🔵  App_info.py module provides version detection for FFmpeg and FFprobe binaries
+       #1366           🔵  File_info.py module extracts media metadata via ffprobe subprocess calls
+     core/file_info.py
+       #1367           🟣  File_info.py subprocess.run now suppresses terminal windows on Windows
+     core/app_info.py
+       #1368           🟣  App_info.py subprocess.run now suppresses terminal windows on Windows
+     core/file_info.py
+       #1369  7:12 PM  🟣  File_info.py subprocess.run now suppresses terminal windows on Windows
+       #1370           🔴  File_info.py missing sys import added for platform check
+     core/ffmpeg_setup.py
+       #1371           🟣  FFmpeg_setup.py subprocess.run now suppresses terminal windows on Windows
+     core/process_control.py
+       #1372           🟣  Process_control.py subprocess.run now suppresses terminal windows on Windows
+     core/ffmpeg_runner.py
+       #1373           🟣  Task 1.1 completed: All subprocess calls now suppress terminal windows on Windows
+     General
+       #1374           🔵  Task 1.2 started: FFmpeg path detection cross-platform enhancement
+     core/ffmpeg_setup.py
+       #1375           ✅  FFmpeg_setup.py module docstring updated with new priority chain
+       #1376  7:13 PM  🟣  FFmpeg_setup.py adds Linux common paths to platform binary detection
+       #1377           🟣  FFmpeg_setup.py adds local ./ffmpeg/ folder detection
+       #1378           🟣  FFmpeg_setup.py integrates local folder into priority chain
+       #1379           🟣  FFmpeg_setup.py adds local folder to ffprobe fallback resolution
+       #1380  7:14 PM  🟣  FFmpeg_setup.py adds local folder to version discovery
+       #1381           🟣  Task 1.2 completed: FFmpeg path detection enhanced with cross-platform support
+     core/process_control.py
+       #1382           🟣  Process_control.py adds permission error handling for Unix pause/resume
+     core/task_runner.py
+       #1383           🟣  Task_runner.py implements permission degradation for Unix pause failures
+     core/process_control.py
+       #1384  7:15 PM  🟣  Task 1.3 completed: Permission degradation handling implemented for Unix pause/resume
+     General
+       #1385           ✅  Phase 1 task progression: Tasks 1.1, 1.2, and 1.3 completed; Task 1.4 started
+     core/ffmpeg_runner.py
+       #1386           🟣  FFmpeg_runner.py adds Unix process group isolation for tree termination
+     core/process_control.py
+       #1387           🟣  Process_control.py enhances Unix process tree termination with process group detection
+     core/ffmpeg_runner.py
+       #1388           🟣  Task 1.4 completed: Cross-platform process tree termination implemented
+     General
+       #1389  7:17 PM  🔵  Phase 1 development completed with four tasks finished
+       #1390  7:18 PM  🔵  Phase 1 verification confirms all modified modules import successfully
+       #1391           🟣  Phase 1 development completed and verified
+       #1392  7:24 PM  🔵  Core module imports verified for Phase 1 development
+     ..\..\Git\GithubManager\ff-intelligent-neo\core\app_info.py
+       #1393  7:32 PM  🔄  Subprocess execution refactored for cross-platform compatibility
+     ..\..\Git\GithubManager\ff-intelligent-neo\core\ffmpeg_setup.py
+       #1394           🟣  Local FFmpeg folder support added to binary discovery
+     ..\..\Git\GithubManager\ff-intelligent-neo\core\task_runner.py
+       #1395           🔴  Task pause failure handling improved with graceful degradation
+     ..\..\Git\GithubManager\ff-intelligent-neo\core\process_control.py
+       #1398  7:41 PM  🔵  Cross-platform compatibility review completed
+       #1399           🔴  Fixed Unix suspend/resume process group handling
+     ..\..\Git\GithubManager\ff-intelligent-neo\core\task_runner.py
+       #1400           🔴  Fixed pause_task degradation cleanup race condition
+     ..\..\Git\GithubManager\ff-intelligent-neo\core\ffmpeg_setup.py
+       #1401  7:42 PM  🔴  Added PyInstaller frozen environment guard
+```
+

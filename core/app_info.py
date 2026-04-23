@@ -22,13 +22,19 @@ _FFPROBE_VERSION_RE = re.compile(r"ffprobe version\s+([^\s]+)", re.IGNORECASE)
 def _run_version_cmd(binary_path: str) -> str:
     """Run `{binary} -version` and return stdout."""
     try:
+        run_kw: dict = {
+            "capture_output": True,
+            "text": True,
+            "timeout": 10,
+            "encoding": "utf-8",
+            "errors": "replace",
+        }
+        if sys.platform == "win32":
+            run_kw["creationflags"] = subprocess.CREATE_NO_WINDOW
+
         result = subprocess.run(
             [binary_path, "-version"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            encoding="utf-8",
-            errors="replace",
+            **run_kw,
         )
         return result.stdout
     except Exception as exc:
