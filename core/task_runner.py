@@ -6,7 +6,9 @@ Phase 4: pause / resume / retry via OS-level process suspension.
 
 from __future__ import annotations
 
+import os
 import subprocess
+import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
@@ -99,7 +101,21 @@ class TaskRunner:
 
         # Apply latest config from frontend if provided
         if config is not None:
-            task.config = TaskConfig.from_dict(config)
+            incoming = TaskConfig.from_dict(config)
+            current = task.config
+            # Preserve the task's sub-configs (merge, avsmix, clip, custom_command)
+            # so that a merge task added from MergePage keeps its own merge config
+            # rather than being overwritten by the global config (which may only
+            # have intro/outro from the Config page).
+            task.config = TaskConfig(
+                transcode=incoming.transcode,
+                filters=incoming.filters,
+                clip=current.clip or incoming.clip,
+                merge=current.merge or incoming.merge,
+                avsmix=current.avsmix or incoming.avsmix,
+                custom_command=current.custom_command or incoming.custom_command,
+                output_dir=incoming.output_dir or current.output_dir,
+            )
 
         ffmpeg_path = get_ffmpeg_path()
         ffprobe_path = get_ffprobe_path()
@@ -136,10 +152,25 @@ class TaskRunner:
         # Build FFmpeg args
         args = build_command(task.config, task.file_path, output_path)
 
-        # Submit to thread pool
+        # For concat_protocol and ts_concat merge modes, create a temp list file
+        temp_list_path: str | None = None
+        if task.config.merge and task.config.merge.merge_mode in ("concat_protocol", "ts_concat"):
+            list_content = "\n".join(
+                f"file '{path}'" for path in task.config.merge.file_list
+            )
+            tmp = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False, encoding="utf-8"
+            )
+            tmp.write(list_content)
+            tmp.close()
+            temp_list_path = tmp.name
+            args = [temp_list_path if a == "list.txt" else a for a in args]
+
+        # Submit to thread pool (pass temp_list_path for cleanup)
         assert self._executor is not None
         self._executor.submit(
-            self._run_task, task, ffmpeg_path, ffprobe_path, args, cancel_event
+            self._run_task, task, ffmpeg_path, ffprobe_path, args, cancel_event,
+            temp_list_path,
         )
         return True
 
@@ -392,8 +423,32 @@ class TaskRunner:
         ffprobe_path: str,
         args: list[str],
         cancel_event: threading.Event,
+        temp_list_path: str | None = None,
     ) -> None:
         """Execute a single task in a worker thread."""
+        task_id = task.id
+
+        try:
+            self._run_task_inner(
+                task, ffmpeg_path, ffprobe_path, args, cancel_event,
+            )
+        finally:
+            # Clean up temp list file for ts_concat
+            if temp_list_path:
+                try:
+                    os.unlink(temp_list_path)
+                except OSError:
+                    pass
+
+    def _run_task_inner(
+        self,
+        task: Task,
+        ffmpeg_path: str,
+        ffprobe_path: str,
+        args: list[str],
+        cancel_event: threading.Event,
+    ) -> None:
+        """Inner task execution (separated for cleanup)."""
         task_id = task.id
 
         def _on_progress(progress: TaskProgress) -> None:

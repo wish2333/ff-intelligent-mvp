@@ -5,21 +5,27 @@
  * Drag-and-drop zone or click to open file dialog.
  * Shows filename with clear button, hover for full path.
  * File type validation is performed on the frontend.
+ *
+ * Phase 3.5.1: Add fullscreenDrop prop for document-level drag handling.
  */
-import { ref, computed, onUnmounted } from "vue"
+import { ref, computed, onMounted, onUnmounted } from "vue"
 import { call } from "../../bridge"
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: string
   accept?: string
   placeholder?: string
-}>()
+  fullscreenDrop?: boolean
+}>(), {
+  fullscreenDrop: false,
+})
 
 const emit = defineEmits<{
   "update:modelValue": [value: string]
 }>()
 
 const isDragging = ref(false)
+const isFullscreenDragging = ref(false)
 const error = ref("")
 let dragCounter = 0
 
@@ -81,6 +87,42 @@ async function onDrop(e: DragEvent): Promise<void> {
   }
 }
 
+// Fullscreen drag handlers
+let fsDragCounter = 0
+
+function onFullscreenDragEnter(e: DragEvent): void {
+  e.preventDefault()
+  fsDragCounter++
+  if (fsDragCounter === 1) isFullscreenDragging.value = true
+}
+
+function onFullscreenDragOver(e: DragEvent): void {
+  e.preventDefault()
+}
+
+function onFullscreenDragLeave(e: DragEvent): void {
+  e.preventDefault()
+  fsDragCounter--
+  if (fsDragCounter === 0) isFullscreenDragging.value = false
+}
+
+async function onFullscreenDrop(e: DragEvent): Promise<void> {
+  e.preventDefault()
+  isFullscreenDragging.value = false
+  fsDragCounter = 0
+  error.value = ""
+  await new Promise((resolve) => setTimeout(resolve, 80))
+  const res = await call<string[]>("get_dropped_files")
+  if (res.success && res.data && res.data.length > 0) {
+    const path = res.data[0]
+    if (validateExtension(path)) {
+      emit("update:modelValue", path)
+    } else {
+      error.value = `Unsupported file type. Accepted: ${props.accept}`
+    }
+  }
+}
+
 async function openFileDialog(): Promise<void> {
   error.value = ""
   try {
@@ -103,8 +145,23 @@ function clear(): void {
   error.value = ""
 }
 
+onMounted(() => {
+  if (props.fullscreenDrop) {
+    document.addEventListener("dragenter", onFullscreenDragEnter)
+    document.addEventListener("dragover", onFullscreenDragOver)
+    document.addEventListener("dragleave", onFullscreenDragLeave)
+    document.addEventListener("drop", onFullscreenDrop)
+  }
+})
+
 onUnmounted(() => {
   dragCounter = 0
+  if (props.fullscreenDrop) {
+    document.removeEventListener("dragenter", onFullscreenDragEnter)
+    document.removeEventListener("dragover", onFullscreenDragOver)
+    document.removeEventListener("dragleave", onFullscreenDragLeave)
+    document.removeEventListener("drop", onFullscreenDrop)
+  }
 })
 </script>
 
@@ -116,6 +173,21 @@ onUnmounted(() => {
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
+    <!-- Fullscreen drag overlay -->
+    <div
+      v-if="isFullscreenDragging"
+      class="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-primary/10"
+    >
+      <div class="rounded-xl border-2 border-dashed border-primary bg-base-100/80 px-12 py-8 text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-10 w-10 text-primary mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <p class="text-lg font-semibold text-primary">Drop file here</p>
+      </div>
+    </div>
+
     <!-- Drop zone / display -->
     <div
       class="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm transition-colors cursor-pointer"
@@ -123,8 +195,7 @@ onUnmounted(() => {
         ? 'border-error bg-error/10'
         : (modelValue
           ? (isDragging ? 'border-primary bg-primary/10' : 'border-base-300 hover:border-base-content/30')
-          : (isDragging ? 'border-primary bg-primary/10' : 'border-base-300 hover:border-primary/50 hover:bg-base-200/50')
-        )
+          : (isDragging ? 'border-primary bg-primary/10' : 'border-base-300 hover:border-primary/50 hover:bg-base-200/50'))
       "
       @click="openFileDialog"
     >

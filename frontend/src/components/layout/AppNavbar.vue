@@ -9,8 +9,11 @@ const ffmpegError = ref("")
 const { resolveTheme, toggleTheme } = useTheme()
 
 const navItems = [
-  { name: "TaskQueue", label: "Task Queue", path: "/task-queue" },
-  { name: "CommandConfig", label: "Command Config", path: "/command-config" },
+  { name: "TaskQueue", label: "Queue", path: "/task-queue" },
+  { name: "CommandConfig", label: "Config", path: "/config" },
+  { name: "AudioSubtitle", label: "A/V Mix", path: "/audio-subtitle" },
+  { name: "Merge", label: "Merge", path: "/merge" },
+  { name: "CustomCommand", label: "Custom", path: "/custom-command" },
   { name: "Settings", label: "Settings", path: "/settings" },
 ]
 
@@ -63,7 +66,7 @@ onUnmounted(() => {
 <template>
   <div class="navbar bg-base-200 px-4">
     <div class="navbar-start">
-      <span class="text-lg font-bold">FF Intelligent Neo</span>
+      <span class="text-lg font-bold">FF Neo</span>
     </div>
 
     <div class="navbar-center flex gap-1">

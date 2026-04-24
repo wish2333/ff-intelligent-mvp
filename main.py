@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import warnings
+import sys
 
 import webview
 
@@ -136,6 +139,13 @@ class FFmpegApi(Bridge):
                 resolution=tc_data.get("resolution", ""),
                 framerate=tc_data.get("framerate", ""),
                 output_extension=tc_data.get("output_extension", ".mp4"),
+                # Phase 3.5: quality fields
+                quality_mode=tc_data.get("quality_mode", ""),
+                quality_value=tc_data.get("quality_value", 0),
+                preset=tc_data.get("preset", ""),
+                pixel_format=tc_data.get("pixel_format", ""),
+                max_bitrate=tc_data.get("max_bitrate", ""),
+                bufsize=tc_data.get("bufsize", ""),
             )
             fc = FilterConfig(
                 rotate=fc_data.get("rotate", ""),
@@ -145,21 +155,94 @@ class FFmpegApi(Bridge):
                 watermark_margin=fc_data.get("watermark_margin", 10),
                 volume=fc_data.get("volume", ""),
                 speed=fc_data.get("speed", ""),
+                # Phase 3: audio normalization + aspect convert
+                audio_normalize=fc_data.get("audio_normalize", False),
+                target_loudness=fc_data.get("target_loudness", -16),
+                true_peak=fc_data.get("true_peak", -1),
+                lra=fc_data.get("lra", 11),
+                aspect_convert=fc_data.get("aspect_convert", ""),
+                target_resolution=fc_data.get("target_resolution", ""),
+                bg_image_path=fc_data.get("bg_image_path", ""),
             )
             task_config = TaskConfig(transcode=tc, filters=fc, output_dir=output_dir)
 
-            # Probe all files first, then add atomically
-            tasks: list[Task] = []
-            for path in paths:
-                info = probe_file(path)
-                task = Task(
-                    file_path=info.get("file_path", path),
-                    file_name=info.get("file_name", ""),
-                    file_size_bytes=info.get("file_size_bytes", 0),
-                    duration_seconds=info.get("duration_seconds", 0.0),
-                    config=task_config,
+            # Phase 3: attach sub-configs if present
+            clip_data = (config or {}).get("clip")
+            if clip_data and (clip_data.get("start_time") or clip_data.get("end_time_or_duration")):
+                from core.models import ClipConfig
+                task_config = TaskConfig(
+                    transcode=tc, filters=fc,
+                    clip=ClipConfig.from_dict(clip_data),
+                    output_dir=output_dir,
                 )
-                tasks.append(task)
+
+            merge_data = (config or {}).get("merge")
+            if merge_data and len(merge_data.get("file_list", [])) >= 2:
+                from core.models import MergeConfig
+                task_config = TaskConfig(
+                    transcode=tc, filters=fc,
+                    merge=MergeConfig.from_dict(merge_data),
+                    output_dir=output_dir,
+                )
+
+            avsmix_data = (config or {}).get("avsmix")
+            if avsmix_data and (avsmix_data.get("external_audio_path") or avsmix_data.get("subtitle_path")):
+                from core.models import AudioSubtitleConfig
+                task_config = TaskConfig(
+                    transcode=tc, filters=fc,
+                    avsmix=AudioSubtitleConfig.from_dict(avsmix_data),
+                    output_dir=output_dir,
+                )
+
+            custom_data = (config or {}).get("custom_command")
+            if custom_data and custom_data.get("raw_args"):
+                from core.models import CustomCommandConfig
+                task_config = TaskConfig(
+                    transcode=tc, filters=fc,
+                    custom_command=CustomCommandConfig.from_dict(custom_data),
+                    output_dir=output_dir,
+                )
+
+            # Determine tasks to add
+            tasks: list[Task] = []
+            if task_config.merge and len(task_config.merge.file_list) >= 2:
+                # Merge mode: create ONE task for the entire merge operation
+                merge_cfg = task_config.merge
+                first_path = merge_cfg.file_list[0]
+                try:
+                    info = probe_file(first_path) or {}
+                    task = Task(
+                        file_path=info.get("file_path", first_path),
+                        file_name=info.get("file_name", ""),
+                        file_size_bytes=info.get("file_size_bytes", 0),
+                        duration_seconds=info.get("duration_seconds", 0.0),
+                        config=task_config,
+                    )
+                except Exception:
+                    task = Task(file_path=first_path, file_name=Path(first_path).name, config=task_config)
+                tasks = [task]
+            else:
+                # Normal mode: create one task per file
+                for path in paths:
+                    try:
+                        info = probe_file(path) or {}
+                        task = Task(
+                            file_path=info.get("file_path", path),
+                            file_name=info.get("file_name", ""),
+                            file_size_bytes=info.get("file_size_bytes", 0),
+                            duration_seconds=info.get("duration_seconds", 0.0),
+                            config=task_config,
+                        )
+                        tasks.append(task)
+                    except Exception as probe_err:
+                        logger.warning("probe_file failed for {}: {}", path, probe_err)
+                        tasks.append(Task(
+                            file_path=path,
+                            file_name=Path(path).name,
+                            file_size_bytes=0,
+                            duration_seconds=0.0,
+                            config=task_config,
+                        ))
 
             # Batch add to queue (single notification)
             self._queue.add_tasks(tasks)
@@ -390,6 +473,48 @@ class FFmpegApi(Bridge):
             logger.exception("validate_config failed: {}", exc)
             return {"success": False, "error": str(exc)}
 
+    @expose
+    def check_hw_encoders(self) -> dict:
+        """Detect available hardware encoders from the current FFmpeg binary."""
+        try:
+            import subprocess
+            ffmpeg_path = get_ffmpeg_path()
+            if not ffmpeg_path:
+                return {"success": True, "data": []}
+            result = subprocess.run(
+                [ffmpeg_path, "-encoders"],
+                capture_output=True, text=True, timeout=30,
+                creationflags=0x08000000 if sys.platform == "win32" else 0,
+            )
+            encoders = []
+            for line in result.stdout.splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 2 and parts[1] not in ("=",):
+                    encoders.append(parts[1])
+            return {"success": True, "data": encoders}
+        except Exception as exc:
+            logger.exception("check_hw_encoders failed: {}", exc)
+            return {"success": False, "error": str(exc)}
+
+    @expose
+    def get_file_duration(self, file_path: str) -> dict:
+        """Get the duration of a media file in seconds using ffprobe."""
+        try:
+            import subprocess
+            ffprobe_path = get_ffmpeg_path().replace("ffmpeg", "ffprobe")
+            if not ffprobe_path or not file_path:
+                return {"success": False, "error": "Invalid file path"}
+            result = subprocess.run(
+                [ffprobe_path, "-v", "error", "-show_entries",
+                 "format=duration", "-of", "csv=p=0", file_path],
+                capture_output=True, text=True, timeout=30,
+                creationflags=0x08000000 if sys.platform == "win32" else 0,
+            )
+            duration = float(result.stdout.strip())
+            return {"success": True, "data": duration}
+        except Exception as exc:
+            logger.exception("get_file_duration failed: {}", exc)
+            return {"success": False, "error": str(exc)}
     @expose
     def get_presets(self) -> dict:
         """Return all presets (defaults + user)."""

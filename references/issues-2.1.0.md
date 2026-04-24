@@ -37,6 +37,7 @@
   1. 开发流程规范（强制）— 文档先行原则，每个需求必须先更新 docs/ 并标记行号
   2. 多平台兼容性 — FFmpeg 下载/检测/路径选择的跨平台方案，暂停/恢复的 macOS/Linux 实现
   3. 功能问题 — 命令构建器完善（编码器库/滤镜/横竖屏/剪辑/音频字幕/多视频拼接），任务完成按钮优化（Reset 替代空
+
     Log），FFmpeg 静默检测
   4. 前端优化 — 水印拖拽组件，版本指示器更新，Download 按钮始终可见，本地 ffmpeg/ 检测，主题切换，i18n
   5. 数据模型变更 — AppSettings/FilterConfig 新字段，新增 Encoder/Merge/Clip/AudioSubtitle 配置
@@ -1043,5 +1044,2272 @@ feat(core): 多平台兼容性与基础修复完成
      ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\settings\FFmpegSetup.vue
        #1612  12:34 AM  🔴  Conditionally render FFmpeg version in UI
        #1613            🔵  Status bar already conditionally renders version
+```
+
+### 📝 Commit Message
+
+```
+feat(ux): Phase 2 user experience optimization - reset, watermark, theme
+
+- Add reset task functionality with log lifecycle management
+- Implement FileDropInput component for watermark path selection
+- Add FFmpeg version real-time update via event system
+- Make download button always visible with confirmation dialog
+- Implement light/dark/auto theme switching
+- Add local file logging with 10MB rotation
+- Fix command preview/execution config sync
+- Optimize Settings page loading with progressive data
+- Fix drag-drop UI performance by replacing Python handlers
+- Synchronize all changes to project documentation
+
+feat(ux): 第二阶段用户体验优化 - 重置、水印、主题
+
+- 新增带日志生命周期管理的任务重置功能
+- 实现用于水印路径选择的FileDropInput组件
+- 通过事件系统实现FFmpeg版本实时更新
+- 使下载按钮始终可见并添加确认对话框
+- 实现亮色/暗色/自动主题切换
+- 新增本地文件日志记录及10MB轮转机制
+- 修复命令预览与执行配置同步问题
+- 通过渐进式数据加载优化设置页面性能
+- 替换Python处理器以修复拖放界面性能
+- 将所有变更同步至项目文档
+```
+
+### 🚀 Release Notes
+
+```
+## 2026-04-24 - User Experience Optimization Phase 2
+
+### ✨ 新增
+- **任务重置功能**：已完成或已取消的任务现在可以重置并重新运行，日志会在重置时自动清除
+- **文件拖放输入**：水印路径选择支持拖放文件和点击选择，并自动过滤支持的图片格式
+- **即时版本更新**：切换 FFmpeg 版本后，导航栏的版本标识会实时更新，无需刷新页面
+- **主题切换**：支持浅色/深色/跟随系统三种主题模式，通过导航栏的太阳/月亮图标切换，设置自动保存
+- **本地日志持久化**：后台日志自动保存至本地文件（`%APPDATA%/ff-intelligent-neo/logs/app_*.log`），支持 10MB 轮转和 7 天保留
+
+### 🐛 修复
+- 修复命令预览与实际执行参数不一致的问题，确保 `fake` 编码器等设置在预览和执行时完全同步
+- 修复文件拖放到页面非拖放区域时错误打开浏览器的问题
+- 修复水印图片拖放后文件名显示延迟和界面卡顿的问题
+- 修复重新下载 FFmpeg 后系统版本从版本列表中消失的问题
+- 修复设置页面加载时长时间转圈甚至卡死的问题，现在页面立即渲染，数据异步加载
+
+### ⚡ 优化
+- `FileDropInput` 组件前端直接验证文件类型，避免后端调用失败被静默吞没
+- 拖放事件使用原生 JavaScript 事件监听器替代 Python IPC，消除高频事件造成的界面卡顿
+- 设置页面三组数据改为 fire-and-forget 异步加载，页面秒开
+- FFmpeg 版本发现限制 `static_ffmpeg` 仅在 Windows 平台搜索，降低非 Windows 平台开销
+- 所有文档（状态机、业务规则、架构、流程、字段定义）已同步 Phase 2 变更
+
+### 💥 Breaking Changes
+- 任务状态机新增 `completed → pending` 和 `cancelled → pending` 转移，重置仅适用于已完成/已取消状态，失败/运行中状态不受影响
+```
+
+## Phase3
+
+### Docs Update
+
+```
+● Phase 3 文档同步完成。以下是变更汇总：
+
+  新增文件（4 个）
+
+  ┌─────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────┐
+  │                文件                 │                                   内容                                    │
+  ├─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤
+  │ docs/fields/Encoder.csv             │ 编码器配置字段（name, display_name, category, hardware_type, quality 等） │
+  ├─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤
+  │ docs/fields/MergeConfig.csv         │ 拼接配置（merge_mode, target_resolution, file_list 等）                   │
+  ├─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤
+  │ docs/fields/ClipConfig.csv          │ 剪辑配置（clip_mode, start_time, end_time_or_duration, use_copy_codec）   │
+  ├─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤
+  │ docs/fields/AudioSubtitleConfig.csv │ 音频字幕配置（external_audio_path, subtitle_path, replace_audio）         │
+  └─────────────────────────────────────┴───────────────────────────────────────────────────────────────────────────┘
+
+  修改文件（6 个）
+
+  ┌───────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────┐
+  │           文件            │                                        变更                                         │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ docs/fields/FilterConfig. │ +7 字段：audio_normalize, target_loudness, true_peak, lra, aspect_convert,          │
+  │ csv                       │ target_resolution, bg_image_path                                                    │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ docs/fields/TranscodeConf │ 扩展 video_codec/audio_codec 描述，列出全部支持的编码器                             │
+  │ ig.csv                    │                                                                                     │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ docs/Structure.md         │ +编码器数据库架构、command_builder 扩展、新增数据模型、新组件、Bridge               │
+  │                           │ API、目录树更新                                                                     │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ docs/BusinessRules.md     │ +8 个业务规则章节：编码器选择、音频归一化、横竖屏转换、视频剪辑、音频字幕混合、多视 │
+  │                           │ 频拼接、命令预览一致性                                                              │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ docs/Procedure.md         │ +5 个业务流程时序图：硬件编码器检测、视频剪辑、多视频拼接、音频字幕混合、横竖屏转换 │
+  ├───────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ references/PRD-2.1.0.md   │ 附录 A 全部更新为 Phase 3 已同步状态                                                │
+  └───────────────────────────┴─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Plan
+
+```
+ Phase 3: Command Builder Feature Completion - Implementation Plan
+
+ Context
+
+ Phase 1 (multi-platform compatibility) and Phase 2 (UX optimization) are complete. Phase 3 adds 7 command builder
+ features: encoder database expansion, hardware encoder detection, audio normalization, aspect ratio conversion, video
+ clipping, audio/subtitle mixing, and multi-video concatenation. All docs are already updated.
+
+ Architecture Overview
+
+ Key design decision: build_command remains the single entry point. It detects the active mode from config and
+ dispatches to mode-specific builders. This satisfies the "命令预览一致性规则" from BusinessRules.md.
+
+ Mode system: TaskConfig gets new optional sub-configs (clip, merge, avsmix). The active mode determines which command
+ builder runs:
+ - default (no sub-config active): current transcode+filter behavior, enhanced
+ - clip: build_clip_command()
+ - merge: build_merge_command()
+ - avsmix: normal transcode+filter + extra -i/-map inputs
+
+ Frontend tabs: CommandConfigPage switches from 2-column grid to tab-based layout.
+
+ Implementation Order
+
+ Step 1: Backend Models (core/models.py)
+
+ File: core/models.py (338 lines)
+
+ Add new frozen dataclasses and extend existing ones:
+
+ 1. Extend FilterConfig (line 70) with Phase 3 fields:
+   - audio_normalize: bool = False
+   - target_loudness: int = -16
+   - true_peak: int = -1
+   - lra: int = 11
+   - aspect_convert: str = ""
+   - target_resolution: str = ""
+   - bg_image_path: str = ""
+ 2. New ClipConfig dataclass:
+   - clip_mode: str = "extract" (extract/cut)
+   - start_time: str = ""
+   - end_time_or_duration: str = ""
+   - use_copy_codec: bool = True
+ 3. New MergeConfig dataclass:
+   - merge_mode: str = "ts_concat" (ts_concat/concat_protocol/filter_complex)
+   - target_resolution: str = ""
+   - target_fps: int = 0
+   - file_list: list[str] = field(default_factory=list)
+ 4. New AudioSubtitleConfig dataclass:
+   - external_audio_path: str = ""
+   - subtitle_path: str = ""
+   - subtitle_language: str = ""
+   - replace_audio: bool = True
+ 5. Extend TaskConfig (line 111) with:
+   - clip: ClipConfig | None = None
+   - merge: MergeConfig | None = None
+   - avsmix: AudioSubtitleConfig | None = None
+
+ All with to_dict() / from_dict().
+
+ Step 2: Backend Command Builder (core/command_builder.py)
+
+ File: core/command_builder.py (601 lines)
+
+ 2a. Expand codec sets (line 20-21):
+ VALID_VIDEO_CODECS = {
+     "libx264", "libx265", "libsvtav1", "libvpx-vp9",
+     "av1_nvenc", "hevc_nvenc", "h264_nvenc",
+     "h264_amf", "hevc_amf", "h264_qsv", "hevc_qsv",
+     "copy", "none",
+ }
+ VALID_AUDIO_CODECS = {
+     "aac", "opus", "flac", "libmp3lame", "alac", "copy", "none",
+ }
+
+ 2b. Register new filters in the _FILTERS registry:
+ - audio_normalize (priority 16): loudnorm=I=X:TP=X:LRA=X in af chain
+ - aspect_convert (priority 35): builds -filter_complex for H2V/V2H modes
+
+ 2c. Add build_clip_command(config, input_path, output_path) -> list[str]:
+ - Pattern: ffmpeg -hide_banner -y -ss START -to END -accurate_seek -i "input" [-c copy] "output"
+ - Time conversion: H:mm:ss.fff -> HH:MM:SS.mmm (replace 8th char colon with dot)
+
+ 2d. Add build_merge_command(config, output_path) -> list[str]:
+ - ts_concat: -f concat -safe 0 -i list.txt -c copy
+ - filter_complex: fps=X,scale=W:H,setsar=1,aformat=sample_rates=44100:channel_layouts=stereo per input, then
+ concat=n=N:v=1:a=1
+
+ 2e. Add build_avsmix_command(config, input_path, output_path) -> list[str]:
+ - Extra -i inputs for audio/subtitle
+ - -map 0:v -map 1:a (audio replacement)
+ - -map 2:s -c:s mov_text -metadata:s:s:0 language=xxx (subtitle)
+
+ 2f. Update main build_command() (line 429):
+ - Check for active sub-configs, dispatch to appropriate builder
+ - For avsmix: run normal build then append extra inputs/maps
+
+ 2g. Update validate_config() (line 510):
+ - Validate new filter params (audio_normalize/volume mutual exclusion, aspect_convert/crop/rotate/watermark mutual
+ exclusion)
+ - Validate clip time ranges
+ - Validate merge file count (>= 2)
+ - Validate avsmix paths exist
+
+ Step 3: Backend Bridge APIs (main.py)
+
+ File: main.py (563 lines)
+
+ 3a. Add check_hw_encoders() Bridge method:
+ - Run ffmpeg -encoders subprocess
+ - Parse output for encoder names
+ - Return { encoders: string[] }
+
+ 3b. Add get_file_duration(file_path) Bridge method:
+ - Run ffprobe -v error -show_entries format=duration -of csv=p=0 input
+ - Return { duration: float }
+
+ 3c. Update build_command Bridge (line 367):
+ - Pass new sub-configs (clip, merge, avsmix) to TaskConfig.from_dict
+
+ 3d. Update validate_config Bridge (line 380):
+ - Same as above
+
+ Step 4: Frontend Types & Data
+
+ File: frontend/src/types/config.ts (27 lines)
+
+ 4a. Extend FilterConfigDTO:
+ audio_normalize: boolean
+ target_loudness: number
+ true_peak: number
+ lra: number
+ aspect_convert: string
+ target_resolution: string
+ bg_image_path: string
+
+ 4b. New interfaces:
+ interface ClipConfigDTO { clip_mode, start_time, end_time_or_duration, use_copy_codec }
+ interface MergeConfigDTO { merge_mode, target_resolution, target_fps, file_list }
+ interface AudioSubtitleConfigDTO { external_audio_path, subtitle_path, subtitle_language, replace_audio }
+ interface EncoderConfigDTO { name, displayName, category, hardwareType?, recommendedQuality?, qualityMode?,
+ description, priority }
+
+ 4c. Extend TaskConfigDTO:
+ clip?: ClipConfigDTO
+ merge?: MergeConfigDTO
+ avsmix?: AudioSubtitleConfigDTO
+
+ New file: frontend/src/data/encoders.ts
+
+ Encoder registry with 13 video + 7 audio encoders as defined in docs/fields/Encoder.csv. Grouped by priority
+ (P0/P1/P2). Exported as VIDEO_ENCODERS, AUDIO_ENCODERS.
+
+ Step 5: Frontend Composables
+
+ File: frontend/src/composables/useGlobalConfig.ts (81 lines)
+
+ 5a. Add new reactive state:
+ const clip = reactive<ClipConfigDTO>({ ...DEFAULT_CLIP })
+ const merge = reactive<MergeConfigDTO>({ ...DEFAULT_MERGE })
+ const avsmix = reactive<AudioSubtitleConfigDTO>({ ...DEFAULT_AVSMIX })
+ const activeMode = ref<'transcode' | 'clip' | 'avsmix' | 'merge'>('transcode')
+
+ 5b. Update toTaskConfig() to include active sub-config based on mode
+ 5c. Update resetAll() to reset new state
+ 5d. Add supportedEncoders: ref<string[]>([]) for hardware detection results
+
+ Step 6: Frontend Components
+
+ 6a. New: frontend/src/components/config/EncoderSelect.vue
+ - Grouped select dropdown (P0/P1/P2)
+ - Gray out unsupported hardware encoders
+ - Auto-fill quality_value and quality_mode on selection
+ - Props: modelValue, category, supportedEncoders
+
+ 6b. Extend: frontend/src/components/config/TranscodeForm.vue (163 lines)
+ - Replace ComboInput with EncoderSelect for video_codec and audio_codec
+ - Remove hardcoded VIDEO_CODEC_SUGGESTIONS / AUDIO_CODEC_SUGGESTIONS
+
+ 6c. Extend: frontend/src/components/config/FilterForm.vue (160 lines)
+ - Add "Audio Normalization" section (toggle + LUFS/TP/LRA params)
+ - Add "Aspect Convert" section (mode select + resolution + bg image)
+ - Mutual exclusion: audio_normalize disables volume; aspect_convert disables crop/rotate/watermark
+ - bg_image_path uses FileDropInput
+
+ 6d. New: frontend/src/components/config/ClipForm.vue
+ - Mode selector (extract/cut)
+ - Start time input (H:mm:ss.fff format)
+ - End time or tail duration input
+ - use_copy_codec toggle
+ - For extract mode: auto-fetch file duration via get_file_duration
+
+ 6e. New: frontend/src/components/config/AvsmixForm.vue
+ - External audio path (FileDropInput, accept audio files)
+ - Subtitle path (FileDropInput, accept .srt/.ass/.ssa)
+ - Subtitle language code input
+ - Replace audio toggle
+
+ 6f. New: frontend/src/components/config/MergeFileList.vue
+ - File list with [Add] / [Remove] / [Up] / [Down] buttons
+ - Each row: index, filename, remove button
+ - Drag-and-drop reorder (native HTML5 drag/drop)
+ - Minimum 2 files validation
+
+ 6g. New: frontend/src/components/config/MergePanel.vue
+ - MergeFileList + merge mode selector + resolution/fps/codec config for filter_complex mode
+ - [Start Merge] button
+
+ Step 7: Frontend Page Layout
+
+ File: frontend/src/pages/CommandConfigPage.vue (101 lines)
+
+ Replace 2-column grid with tab layout:
+
+ TabBar: [Transcode] [Filters] [Clip] [Audio/Subtitle] [Merge]
+ - Transcode tab: TranscodeForm (uses EncoderSelect)
+ - Filters tab: FilterForm (extended with normalize + aspect convert)
+ - Clip tab: ClipForm
+ - Audio/Subtitle tab: AvsmixForm
+ - Merge tab: MergeFileList + MergePanel
+ CommandPreview (always visible at bottom)
+
+ Step 8: Hardware Encoder Detection
+
+ File: frontend/src/pages/CommandConfigPage.vue
+
+ - On mount: call check_hw_encoders() once
+ - Store results in useGlobalConfig().supportedEncoders
+ - Pass to EncoderSelect components
+
+ Files Modified (Summary)
+
+ ┌──────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────┐
+ │                       File                       │                            Action                             │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ core/models.py                                   │ Extend FilterConfig, add                                      │
+ │                                                  │ ClipConfig/MergeConfig/AudioSubtitleConfig, extend TaskConfig │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ core/command_builder.py                          │ Expand codecs, register new filters, add clip/merge/avsmix    │
+ │                                                  │ builders, update build_command                                │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ main.py                                          │ Add check_hw_encoders/get_file_duration, update               │
+ │                                                  │ build_command/validate_config                                 │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/types/config.ts                     │ Extend types, add new interfaces                              │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/data/encoders.ts                    │ NEW - encoder registry                                        │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/composables/useGlobalConfig.ts      │ Add clip/merge/avsmix/activeMode/supportedEncoders            │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/EncoderSelect.vue │ NEW - grouped encoder selector                                │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/TranscodeForm.vue │ Use EncoderSelect                                             │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/FilterForm.vue    │ Add normalize + aspect convert sections                       │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/ClipForm.vue      │ NEW - clip configuration                                      │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/AvsmixForm.vue    │ NEW - audio/subtitle mixing                                   │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/MergeFileList.vue │ NEW - drag-sort file list                                     │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/MergePanel.vue    │ NEW - merge configuration                                     │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/pages/CommandConfigPage.vue         │ Tab-based layout                                              │
+ └──────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────┘
+
+ Verification (Manual Test Items)
+
+ 1. Encoder selection: Open Command Config > Transcode tab > video codec dropdown shows grouped encoders (P0/P1/P2)
+ with hardware detection marks
+ 2. Audio normalization: Enable audio_normalize in Filters tab > volume field disables > command preview shows loudnorm
+  filter
+ 3. Aspect convert: Select H2V-B mode > crop/rotate/watermark disabled > command preview shows scale+pad filter_complex
+ 4. Video clip: Switch to Clip tab > cut mode > enter start/end times > command preview shows -ss -to -accurate_seek
+ 5. Audio/subtitle: Switch to Audio/Subtitle tab > drag audio file > command preview shows -map 0:v -map 1:a
+ 6. Merge: Switch to Merge tab > add 2+ files > select ts_concat > command preview shows -f concat
+ 7. Mode mutual exclusion: Switch between tabs, verify command preview updates correctly per mode
+ 8. Build check: cd frontend && bun run build passes with no errors
+```
+
+### 完成1（不满意）
+
+```
+● Phase 3 implementation is complete. Here's a summary of what was done in this session:
+
+  New components created (5):
+  - EncoderSelect.vue - Grouped encoder dropdown (P0/P1/P2) with hardware detection graying
+  - ClipForm.vue - Extract/cut mode with auto file duration fetch
+  - AvsmixForm.vue - External audio path + subtitle embedding with FileDropInput
+  - MergeFileList.vue - Drag-and-drop file list with add/remove/reorder
+  - MergePanel.vue - Merge mode selector + file list + filter_complex settings
+
+  Existing components updated (3):
+  - TranscodeForm.vue - Replaced ComboInput with EncoderSelect for video/audio codec
+  - FilterForm.vue - Added audio normalization (loudnorm) section + aspect ratio conversion section with mutual
+  exclusion logic
+  - CommandConfigPage.vue - Refactored from 2-column grid to tab layout (Transcode/Filters/Clip/Audio-Subtitle/Merge),
+  added hardware encoder detection on mount
+
+  Build: vue-tsc --noEmit && vite build passes with no errors.
+
+  All 8 steps of the Phase 3 plan are now complete. The full feature set (encoder database, hardware detection, audio
+  normalization, aspect ratio conversion, video clipping, audio/subtitle mixing, multi-video concatenation) has been
+  implemented across backend models, command builder, bridge APIs, and frontend UI.
+```
+
+### 改进
+
+- 视频编码器的品质、码率等设置仍然非常不完善，详见\references\command_builder.md自检
+  - 所有界面挤在Command Cofig界面里非常拥挤，具体见下方意见
+  - Command Config大标题说明文字“FFmpeg Command Configuration-Settingsonthispageapplywhenadding
+    filesfromtheTaskQueue.”占空间，适当优化，并把命令构建预览放到顶端（预设上面）
+  - Filter Complex合并格式考虑不周，详见\references\command_builder.md，当中fps、scale、setsar=1(这个不支持修改但也需要
+    传入)这三项是必须的这样才能确保不出错，所以都需要传入默认值
+  - Audio/Subtitle、Merge这两个需要传入文件的单独一个界面，含命令构建预览、相关设置、文件列表。无需编解码设置，继承Tran
+    scode这边的即可。Transcode、Filters、Clip这几个在一个界面就好
+  - Clip相关没输入则不加入构建参数
+  - Merge在现在把所有视频拼一起以外，添加批量添加片头片尾的功能（所有视频加一样的片头片尾）——只能用filtercomplex拼接
+  - 新增完全自定义输入的命令（除了固定输入-i、-y、输出文件名以外各种参数包括后缀名）界面
+
+补充改进：
+
+- 音视频编码器的自定义输入功能又不见了
+
+```
+  Updated files:
+
+  ┌─────────────────────────────────┬────────────────────────────────────────────────────────────────────────────────┐
+  │              File               │                                    Changes                                     │
+  ├─────────────────────────────────┼────────────────────────────────────────────────────────────────────────────────┤
+  │ docs/fields/Encoder.csv         │ Added custom encoder input support notes                                       │
+  ├─────────────────────────────────┼────────────────────────────────────────────────────────────────────────────────┤
+  │ docs/fields/TranscodeConfig.csv │ (done in prior session) 5 quality fields                                       │
+  ├─────────────────────────────────┼────────────────────────────────────────────────────────────────────────────────┤
+  │ docs/fields/MergeConfig.csv     │ (done in prior session) intro_path, outro_path, defaults                       │
+  ├─────────────────────────────────┼────────────────────────────────────────────────────────────────────────────────┤
+  │ docs/BusinessRules.md           │ +7 new rule sections: custom encoder, quality params, clip conditional, merge  │
+  │                                 │ defaults, intro/outro, page layout, custom command                             │
+  ├─────────────────────────────────┼────────────────────────────────────────────────────────────────────────────────┤
+  │                                 │ +3 new pages, data models (CustomCommandConfig, TranscodeConfig quality        │
+  │ docs/Structure.md               │ fields, MergeConfig intro/outro), route table, TranscodeForm quality fields,   │
+  │                                 │ command builder extensions                                                     │
+  ├─────────────────────────────────┼────────────────────────────────────────────────────────────────────────────────┤
+  │ docs/Procedure.md               │ +4 new sequence diagrams: quality auto-fill, custom command, intro/outro       │
+  │                                 │ merge, clip conditional                                                        │
+  ├─────────────────────────────────┼────────────────────────────────────────────────────────────────────────────────┤
+  │ references/PRD-2.1.0.md         │ Updated A.1-A.5 appendices with Phase 3.5 status, business rules, fields       │
+  │                                 │ changes, structure changes, procedure changes                                  │
+  └─────────────────────────────────┴────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```
+ Phase 3.5: Command Builder Improvements Plan
+
+ Context
+
+ Phase 3 basic features are implemented (encoder DB, HW detection, normalize, aspect convert, clip, avsmix, merge).
+ User testing revealed several issues: incomplete encoder quality settings, overcrowded UI, missing custom encoder
+ input, incomplete merge filter_complex defaults, no batch intro/outro, and no custom command mode. This plan addresses
+  all 9 improvement items.
+
+ ---
+ Improvement Summary
+
+ ┌─────┬─────────────────────────────────────┬─────────────────────────────────────────────────────────────────────┐
+ │  #  │                Issue                │                                 Fix                                 │
+ ├─────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+ │ 1   │ Encoder quality/bitrate settings    │ Add quality_mode, quality_value, preset, pixel_format, max_bitrate  │
+ │     │ incomplete                          │ to TranscodeConfig                                                  │
+ ├─────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+ │ 2   │ UI too crowded                      │ Split into separate pages (Config, A/V Mix, Merge, Custom)          │
+ ├─────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+ │ 3   │ Header wastes space, preview at     │ Minimize header, move preview to top                                │
+ │     │ bottom                              │                                                                     │
+ ├─────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+ │ 4   │ Merge filter_complex missing        │ Default fps=30, scale=1920:1080, setsar=1 always                    │
+ │     │ defaults                            │                                                                     │
+ ├─────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+ │ 5   │ A/V Mix + Merge need own pages      │ New routes with own command preview, inherit transcode              │
+ ├─────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+ │ 6   │ Clip params added even when empty   │ Only include clip when inputs are filled                            │
+ ├─────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+ │ 7   │ Merge batch intro/outro             │ New intro_path/outro_path on MergeConfig                            │
+ ├─────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+ │ 8   │ Custom command page                 │ New page with raw args textarea                                     │
+ ├─────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+ │ 9   │ Custom encoder input gone           │ Restore via "Other..." option in EncoderSelect                      │
+ └─────┴─────────────────────────────────────┴─────────────────────────────────────────────────────────────────────┘
+
+ ---
+ Step 1: Backend Models (core/models.py)
+
+ 1a. Extend TranscodeConfig (line 30)
+
+ Add after output_extension:
+
+ quality_mode: str = ""       # "crf", "cq", "qp"
+ quality_value: int = 0       # CRF/CQ/QP numeric value
+ preset: str = ""             # encoding speed preset
+ pixel_format: str = ""       # "yuv420p", "yuv420p10le"
+ max_bitrate: str = ""        # e.g. "8M"
+
+ Update to_dict() and from_dict() to include all 5 new fields.
+
+ 1b. Extend MergeConfig (line 167)
+
+ Add:
+
+ intro_path: str = ""         # intro video for batch prepend
+ outro_path: str = ""         # outro video for batch append
+
+ Update to_dict() and from_dict().
+
+ 1c. New CustomCommandConfig dataclass
+
+ @dataclass(frozen=True)
+ class CustomCommandConfig:
+     raw_args: str = ""
+     output_extension: str = ".mp4"
+
+ 1d. Extend TaskConfig (line 230)
+
+ Add field: custom_command: CustomCommandConfig | None = None
+
+ Update to_dict() / from_dict().
+
+ ---
+ Step 2: Backend Command Builder (core/command_builder.py)
+
+ 2a. Add quality transcode params
+
+ Register 4 new transcode params using _register_transcode_param:
+
+ - quality_mode -> builds -crf N / -cq N / -qp N (reads quality_value from tc)
+ - preset -> builds -preset val
+ - pixel_format -> builds -pix_fmt val
+ - max_bitrate -> builds -maxrate val -bufsize 2M
+
+ All skip when video_codec is copy/none. Add VALID_PRESETS constant.
+
+ 2b. Fix merge filter_complex defaults (line ~631)
+
+ Change from optional to always-required with defaults:
+
+ res = merge.target_resolution.replace("x", ":") if merge.target_resolution else "1920:1080"
+ fps = merge.target_fps if merge.target_fps > 0 else 30
+ v_chain = f"fps={fps},scale={res},setsar=1"
+
+ 2c. Fix clip conditional (line ~753)
+
+ Only dispatch to clip builder when inputs are filled:
+
+ if config.clip and (config.clip.start_time or config.clip.end_time_or_duration):
+
+ 2d. Add merge intro/outro command builder
+
+ New function build_merge_intro_outro_command(config, content_file, output_path). When merge.intro_path or
+ merge.outro_path is set, builds a 3-input filter_complex concat: [intro][content][outro] with the same normalization
+ chain. Preview shows first content file as placeholder.
+
+ 2e. Add custom command builder
+
+ New function build_custom_command(config, input_path, output_path):
+
+ args = ["-hide_banner", "-y", "-i", input_path]
+ args.extend(shlex.split(cc.raw_args.strip()))
+ args.extend(["-y", output_path])
+
+ Update build_command dispatch: custom_command checked first, then clip, then merge, then default.
+
+ Update build_command_preview to handle custom and intro/outro modes.
+
+ ---
+ Step 3: Backend Bridge (main.py)
+
+ 3a. Update add_tasks (line 132)
+
+ Add new quality fields to TranscodeConfig() construction:
+
+ quality_mode=tc_data.get("quality_mode", ""),
+ quality_value=tc_data.get("quality_value", 0),
+ preset=tc_data.get("preset", ""),
+ pixel_format=tc_data.get("pixel_format", ""),
+ max_bitrate=tc_data.get("max_bitrate", ""),
+
+ 3b. Update FilterConfig construction (line 141)
+
+ Add the Phase 3 filter fields that are currently missing in add_tasks:
+
+ audio_normalize=fc_data.get("audio_normalize", False),
+ target_loudness=fc_data.get("target_loudness", -16),
+ true_peak=fc_data.get("true_peak", -1),
+ lra=fc_data.get("lra", 11),
+ aspect_convert=fc_data.get("aspect_convert", ""),
+ target_resolution=fc_data.get("target_resolution", ""),
+ bg_image_path=fc_data.get("bg_image_path", ""),
+
+ Also pass clip/merge/avsmix sub-configs from config dict.
+
+ ---
+ Step 4: Frontend Types (frontend/src/types/config.ts)
+
+ 4a. Extend TranscodeConfigDTO
+
+ Add: quality_mode, quality_value, preset, pixel_format, max_bitrate.
+
+ 4b. Extend MergeConfigDTO
+
+ Add: intro_path, outro_path.
+
+ 4c. New CustomCommandConfigDTO
+
+ interface CustomCommandConfigDTO { raw_args: string; output_extension: string }
+
+ 4d. Extend TaskConfigDTO
+
+ Add: custom_command?: CustomCommandConfigDTO
+
+ 4e. Update ActiveMode
+
+ Add "custom" to the union type.
+
+ ---
+ Step 5: Frontend Composable (frontend/src/composables/useGlobalConfig.ts)
+
+ - Add 5 new fields to DEFAULT_TRANSCODE
+ - Add intro_path, outro_path to DEFAULT_MERGE
+ - Add DEFAULT_CUSTOM and customCommand reactive state
+ - Update toTaskConfig(): only include clip when fields filled, include custom_command when mode is "custom"
+ - Add resetCustom(), export customCommand
+ - Update resetAll()
+
+ ---
+ Step 6: Frontend Components
+
+ 6a. Rewrite EncoderSelect.vue
+
+ - Add "Other (custom name)..." option at bottom of select
+ - When selected, reveal text input for custom encoder name
+ - Emit qualityChange with { quality, mode } for presets, null for custom
+
+ 6b. Extend TranscodeForm.vue
+
+ - Handle qualityChange event from EncoderSelect (auto-fill quality_mode/quality_value)
+ - Add UI fields: Quality Mode (select), Quality Value (number), Preset (select), Pixel Format (ComboInput), Max
+ Bitrate (input)
+ - Clear all quality fields when codec switches to copy/none
+ - Keep output format as ComboInput
+
+ ---
+ Step 7: Page Restructuring
+
+ 7a. Router (frontend/src/router.ts)
+
+ Add 3 new routes:
+
+ ┌─────────────────┬───────────────┬───────────────────────┐
+ │      Path       │     Name      │       Component       │
+ ├─────────────────┼───────────────┼───────────────────────┤
+ │ /audio-subtitle │ AudioSubtitle │ AudioSubtitlePage.vue │
+ ├─────────────────┼───────────────┼───────────────────────┤
+ │ /merge          │ Merge         │ MergePage.vue         │
+ ├─────────────────┼───────────────┼───────────────────────┤
+ │ /custom-command │ CustomCommand │ CustomCommandPage.vue │
+ └─────────────────┴───────────────┴───────────────────────┘
+
+ 7b. Navbar (AppNavbar.vue)
+
+ Add nav items: "A/V Mix" /audio-subtitle, "Merge" /merge, "Custom" /custom-command. Rename "Command Config" to
+ "Config".
+
+ 7c. Rewrite CommandConfigPage.vue
+
+ - Remove large title + description
+ - Command preview at TOP
+ - Preset selector below preview
+ - Tabs: only Transcode, Filters, Clip
+ - Remove avsmix/merge tabs
+
+ 7d. NEW AudioSubtitlePage.vue
+
+ - AvsmixForm + CommandPreview
+ - Sets activeMode = "avsmix" on mount
+ - Inherits transcode from global config (no transcode UI)
+
+ 7e. NEW MergePage.vue
+
+ - MergePanel + intro/outro section + CommandPreview
+ - Sets activeMode = "merge" on mount
+ - Intro/outro section visible only in filter_complex mode
+ - Inherits transcode from global config
+
+ 7f. NEW CustomCommandPage.vue
+
+ - Textarea for raw FFmpeg args
+ - Output extension selector
+ - Inline preview: ffmpeg -hide_banner -i "input.mp4" {args} -y "output{ext}"
+ - Sets activeMode = "custom" on mount
+
+ ---
+ Step 8: Merge Intro/Outro Backend Details
+
+ When merge.intro_path or merge.outro_path are set:
+
+ - Force merge_mode = "filter_complex"
+ - For each content file in file_list, build command:
+   - Input 0 = intro (if set), Input 1 = content, Input 2 = outro (if set)
+   - All inputs normalized: fps=30,scale=W:H,setsar=1
+   - Audio: aformat=sample_rates=44100:channel_layouts=stereo
+   - concat=n=N:v=1:a=1
+ - Preview uses first content file as placeholder
+ - Task runner calls per-file for batch execution
+
+ ---
+ Files Modified (Summary)
+
+ ┌──────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────┐
+ │                       File                       │                            Action                             │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ core/models.py                                   │ Extend TranscodeConfig, MergeConfig, TaskConfig; add          │
+ │                                                  │ CustomCommandConfig                                           │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ core/command_builder.py                          │ Register quality params, fix merge defaults, fix clip         │
+ │                                                  │ conditional, add intro/outro builder, add custom builder      │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ main.py                                          │ Update add_tasks fields, ensure new modes dispatched          │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/types/config.ts                     │ Add quality/merge/custom types                                │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/composables/useGlobalConfig.ts      │ Add new reactive state, conditional clip/custom               │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/EncoderSelect.vue │ Rewrite: add custom input + qualityChange emit                │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/TranscodeForm.vue │ Add quality/preset/pixel_format/max_bitrate fields            │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/router.ts                           │ Add 3 new routes                                              │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/layout/AppNavbar.vue     │ Add 3 new nav items                                           │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/pages/CommandConfigPage.vue         │ Restructure: preview top, remove avsmix/merge                 │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/pages/AudioSubtitlePage.vue         │ NEW                                                           │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/pages/MergePage.vue                 │ NEW                                                           │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/pages/CustomCommandPage.vue         │ NEW                                                           │
+ └──────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────┘
+
+ Verification
+
+ 1. cd frontend && bun run build -- no TypeScript or build errors
+ 2. Write manual test items to tests/manual_test_plan.md covering:
+   - Quality auto-fill (select libx264 -> crf=23 auto-filled)
+   - Custom encoder ("Other..." -> type libx265)
+   - Quality params in command preview (-crf, -preset, -pix_fmt, -maxrate)
+   - Navigation (all 6 pages accessible)
+   - Preview position (top of Command Config page)
+   - Merge filter_complex defaults (fps=30, scale=1920:1080)
+   - Clip conditional (empty inputs -> no clip params)
+   - A/V Mix page (independent, command preview works)
+   - Merge page (independent, intro/outro section)
+   - Custom command page (raw args, preview)
+   - Preset save/load with new fields
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+```
+
+### Complete
+
+```
+  Backend (Python):
+
+  - core/models.py - Extended TranscodeConfig with 5 quality fields, MergeConfig with intro/outro, new
+    CustomCommandConfig, extended TaskConfig
+  - core/command_builder.py - Registered 4 quality transcode params (quality_mode, preset, pixel_format, max_bitrate),
+    fixed merge filter_complex defaults (fps=30, scale=1920:1080, setsar=1), fixed clip conditional, added
+      build_custom_command(), build_merge_intro_outro_command(), updated dispatch order (custom > clip > merge > default)
+  - main.py - Updated add_tasks with quality fields, Phase 3 filter fields, and sub-configs (clip/merge/avsmix/custom)
+
+  Frontend (Vue/TypeScript):
+
+  - types/config.ts - Added quality fields, intro/outro, CustomCommandConfigDTO, "custom" mode
+  - useGlobalConfig.ts - Added custom command state, conditional clip inclusion, quality defaults
+  - EncoderSelect.vue - Added "Other..." custom input option with qualityChange event
+  - TranscodeForm.vue - Added Quality Mode, Quality Value, Preset, Pixel Format, Max Bitrate fields
+  - router.ts - Added 3 new routes (/audio-subtitle, /merge, /custom-command)
+  - AppNavbar.vue - Added 3 new nav items, compacted title
+  - CommandConfigPage.vue - Preview moved to top, only 3 tabs (Transcode/Filters/Clip)
+  - AudioSubtitlePage.vue - NEW independent page
+  - MergePage.vue - NEW independent page with intro/outro section
+  - CustomCommandPage.vue - NEW page with raw args textarea
+
+
+```
+
+### 问题
+
+- Merge页面，多文件合并应该有独立的命令构建预览和开始按钮，能将任务添加到Queue页面的列表中；而Intro/Outro则是和现在的逻辑相似；FilterComplex的TargetResolution默认设置为1920x1080，设置成两个输入框，这样用户就不用手动输入x了，TargetFPS默认设置为30
+- Config界面
+  - MaxBitrate的bufsize需要可修改，显示顺序依次为VC-QM-QV-Resolution-Framerate-VB-MB-bufsize-EP-PF
+  - Audio的Audio Bitrate默认改为128k
+  - Filters中新的旋转模式没有命令预览，并且要有相关功能的说明。新的旋转模式应该用的是filtercomplex吧，要把resolution和fps分别设置默认值以防合并错误；此外，选择了Rotate再选新的旋转模式会导致两个选项都被冻结。
+  - Filters中crop要有更详细一点点的说明文字
+    - **out_w**: Width of the cropped area.
+    - **out_h**: Height of the cropped area.
+    - **x**: X-coordinate of the top-left corner of the crop area.
+    - **y**: Y-coordinate of the top-left corner of the crop area.
+  - Apply EBU R128 loudness normalization这一小段文字没有和附近元素对齐
+  - Speed输入要求在0.25-4之间
+- 传输的命令中，文件路径和filtercomplex的参数要加上双引号，避免终端无法识别可能的非法路径（如夹了空格的文件路径等）
+- 前端优化：Config页面中Encoding Config、Filter、Clip三个子模块只能同时显示一个，点击切换其他就隐藏，这样只显示一个的话，每个模块就不要像这样非常长的模式了，都分成三个竖栏
+
+请针对问题，先进行计划，修改PRD-2.1.0.md和相关docs\文档，再执行
+
+补充修改：水印上传的拖拽改为全屏可拖放，A/V Mix的Audio和Subtitle各占半屏可拖放
+
+### Plan
+
+```
+ Phase 3.5.1: Bug Fixes & UX Improvements Plan
+
+ Context
+
+ Phase 3.5 implementation is complete. User testing revealed additional issues across Merge page independence, Config
+ page field ordering/mutual exclusion bugs, command quoting for paths with spaces, and tab layout optimization. This
+ plan addresses all reported issues plus supplementary UX requests.
+
+ ---
+ Issue Summary
+
+ ┌─────┬────────────────┬────────────────────────────────────────┬─────────────────────────────────────────────────┐
+ │  #  │      Area      │                 Issue                  │                       Fix                       │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 1   │ Merge Page     │ No "Add to Queue" button, needs        │ Add button + bridge call, restructure page      │
+ │     │                │ independent task submission            │                                                 │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 2   │ Merge Panel    │ TargetResolution single input, no      │ Split into W/H inputs, default 1920x1080, FPS   │
+ │     │                │ defaults                               │ default 30                                      │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 3   │ TranscodeForm  │ MaxBitrate bufsize hardcoded "2M",     │ Add bufsize field, reorder to                   │
+ │     │                │ field order wrong                      │ VC-QM-QV-Res-FPS-VB-MB-buf-EP-PF                │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 4   │ TranscodeForm  │ Audio bitrate default "192k"           │ Change to "128k"                                │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 5   │ FilterForm     │ Rotate + Aspect Convert both freeze    │ Add watchers to clear mutually exclusive        │
+ │     │                │ when both selected                     │ selections                                      │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 6   │ FilterForm     │ Crop description too brief             │ Add detailed field descriptions for W:H:X:Y     │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 7   │ FilterForm     │ "Apply EBU R128..." label misaligned   │ Fix label alignment to match other checkboxes   │
+ │     │                │ with checkbox                          │                                                 │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 8   │ FilterForm     │ Speed range description says 0.25-100, │ Update placeholder, validation, description to  │
+ │     │                │  should be 0.25-4                      │ 0.25-4                                          │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 9   │ Command        │ File paths not quoted, filter_complex  │ Quote all file paths and filter_complex values  │
+ │     │ Builder        │ params unquoted                        │ with shlex                                      │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 10  │ Config Page    │ All 3 tabs shown simultaneously, forms │ Exclusive tab display, split each form into     │
+ │     │                │  too long                              │ 3-column grid                                   │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 11  │ Watermark      │ Drag area too small                    │ Fullscreen drag-drop support                    │
+ ├─────┼────────────────┼────────────────────────────────────────┼─────────────────────────────────────────────────┤
+ │ 12  │ A/V Mix        │ Audio and Subtitle each tiny drop zone │ Each takes half screen, full drag-drop          │
+ └─────┴────────────────┴────────────────────────────────────────┴─────────────────────────────────────────────────┘
+
+ ---
+ Step 1: Backend - Models (core/models.py)
+
+ 1a. Add bufsize to TranscodeConfig
+
+ Add field after max_bitrate:
+ bufsize: str = ""  # e.g. "2M"
+ Update to_dict() and from_dict().
+
+ 1b. Update merge defaults in MergeConfig
+
+ Change target_fps default from 0 to 30 and target_resolution default to "1920x1080":
+ target_resolution: str = "1920x1080"
+ target_fps: int = 30
+
+ ---
+ Step 2: Backend - Command Builder (core/command_builder.py)
+
+ 2a. Use shlex.quote for all file paths
+
+ Currently only build_merge_intro_outro_command and build_custom_command quote paths. Need to quote in all functions:
+
+ - build_command() (line 1007): quote input_path
+ - build_command() (line 141): quote fc.watermark_path
+ - build_command() (line 987-988): quote avsmix.external_audio_path, avsmix.subtitle_path
+ - build_command() (line 1068-1069): quote fc.bg_image_path
+ - build_clip_command() (line 653): quote input_path
+ - build_merge_command() (line 728-729): quote each file in list
+ - build_avsmix_command() (line 766-771): quote extra paths
+ - build_merge_intro_outro_command(): already quotes (line 854)
+ - build_custom_command(): already quotes (line 886)
+ - output_path in all functions: quote as well
+
+ 2b. Update max_bitrate param to use bufsize
+
+ Change the max_bitrate build lambda (line 288):
+ ["-maxrate", val, "-bufsize", tc.bufsize] if val and tc.bufsize
+ else ["-maxrate", val, "-bufsize", "2M"] if val
+ else []
+
+ 2c. Update speed validation range
+
+ Change speed validation from < 0.25 or > 100 to < 0.25 or > 4:
+ [{"level": "error", "message": "Speed must be between 0.25 and 4"}]
+ if float(val) < 0.25 or float(val) > 4
+
+ Remove the 0.5-4.0 warning (keep it since >2 is still risky for atempo):
+ Actually keep the warning but adjust the error boundary to 4.0.
+
+ ---
+ Step 3: Backend - Bridge (main.py)
+
+ 3a. Add bufsize to TranscodeConfig construction in add_tasks
+
+ bufsize=tc_data.get("bufsize", ""),
+
+ 3b. Update merge defaults in add_tasks
+
+ Update MergeConfig construction:
+ target_resolution=merge_data.get("target_resolution", "1920x1080"),
+ target_fps=merge_data.get("target_fps", 30),
+
+ ---
+ Step 4: Frontend Types (frontend/src/types/config.ts)
+
+ 4a. Add bufsize to TranscodeConfigDTO
+
+ bufsize: string
+
+ ---
+ Step 5: Frontend Composable (frontend/src/composables/useGlobalConfig.ts)
+
+ - Add bufsize: "" to DEFAULT_TRANSCODE
+ - Change audio_bitrate default from "192k" to "128k"
+ - Change DEFAULT_MERGE: target_resolution: "1920x1080", target_fps: 30
+ - Update resetTranscode() to include bufsize
+ - Add bufsize clearing in TranscodeForm's copy/none watcher (via composable or component)
+
+ ---
+ Step 6: Frontend Components
+
+ 6a. TranscodeForm.vue - Field reorder + bufsize + default change
+
+ New field order (only when video re-encode):
+ 1. Video Codec
+ 2. Quality Mode
+ 3. Quality Value (if quality mode set)
+ 4. Resolution (input W x H) -- keep as single input, this is TranscodeForm not MergePanel
+ 5. Framerate
+ 6. Video Bitrate
+ 7. Max Bitrate
+ 8. Bufsize (new field, shown when max_bitrate is set)
+ 9. Encoding Preset
+ 10. Pixel Format
+ 11. --- Audio divider ---
+ 12. Audio Codec
+ 13. Audio Bitrate (placeholder: "e.g. 128k, 320k")
+ 14. --- Output divider ---
+ 15. Output Format
+
+ Add bufsize input field:
+ <div v-if="isVideoReencode() && config.max_bitrate" class="form-control mb-3">
+   <label class="label py-1"><span class="label-text text-xs">Buffer Size</span></label>
+   <input v-model="config.bufsize" type="text" placeholder="e.g. 2M (default 2M)" />
+ </div>
+
+ Also clear bufsize in the copy/none watcher.
+
+ 6b. FilterForm.vue - Fix mutual exclusion + crop + normalize + speed
+
+ Fix Rotate/Aspect Convert freeze:
+ Add watchers:
+ watch(() => props.config.aspect_convert, (val) => {
+   if (val) props.config.rotate = ""
+ })
+ watch(() => props.config.rotate, (val) => {
+   if (val) props.config.aspect_convert = ""
+ })
+ Simplify disable logic: disabled="hasAspectConvert" on Rotate, disabled="!!config.rotate" on Aspect Convert.
+
+ Crop description update:
+ Change the description text to:
+ Crop format: W:H:X:Y
+   out_w: Width of the cropped area
+   out_h: Height of the cropped area
+   x: X-coordinate of top-left corner
+   y: Y-coordinate of top-left corner
+ Leave empty to skip cropping
+
+ Audio normalize alignment:
+ The "Apply EBU R128 loudness normalization" text is a <label class="label py-0.5"> under the checkbox. It's
+ misaligned. Move it to be inside the checkbox label or adjust the label structure to use label-text-alt with proper
+ padding. The checkbox uses justify-start gap-2 which should be correct. Check if the description label needs pl-6 to
+ align with checkbox text.
+
+ Speed range:
+ - Change placeholder to "e.g. 2.0 (faster), 0.5 (slower)"
+ - Change description to "Leave empty for original speed (range 0.25 - 4)"
+ - Add frontend validation: warn if value outside 0.25-4
+
+ 6c. MergePanel.vue - Split TargetResolution, default FPS
+
+ Replace single text input with two number inputs:
+ <div class="flex gap-2">
+   <input v-model.number="mergeWidth" type="number" placeholder="1920" />
+   <span class="self-center text-xs">x</span>
+   <input v-model.number="mergeHeight" type="number" placeholder="1080" />
+ </div>
+ Use computed get/set to split/combine with config.target_resolution. Default values 1920 and 1080.
+
+ TargetFPS: change default display from 0 to 30, update placeholder to "30 (original if 0)".
+
+ 6d. FileDropInput.vue - Support fullscreen drag
+
+ The current FileDropInput only handles drag on its own element. For watermark and A/V Mix, the user wants a larger
+ drop area. Two approaches:
+ 1. Add a fullscreen-drop prop that registers document-level drag listeners
+ 2. Wrap the page-level component with a fullscreen drop overlay
+
+ Option 1 is cleaner. When fullscreen-drop is true, use document.addEventListener for
+ dragenter/dragover/dragleave/drop, and show a fullscreen overlay when dragging (similar to TaskQueuePage's approach).
+
+ 6e. AvsmixForm.vue - Half-screen layout + fullscreen drop
+
+ Restructure to use a 2-column grid:
+ <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+   <!-- Audio half -->
+   <div class="card bg-base-200 shadow-sm">
+     ...audio section with fullscreen-drop FileDropInput...
+   </div>
+   <!-- Subtitle half -->
+   <div class="card bg-base-200 shadow-sm">
+     ...subtitle section with fullscreen-drop FileDropInput...
+   </div>
+ </div>
+
+ 6f. FilterForm.vue - Watermark fullscreen drop
+
+ Change watermark FileDropInput to use fullscreen-drop prop.
+
+ ---
+ Step 7: Page Changes
+
+ 7a. CommandConfigPage.vue - Exclusive tabs + 3-column layout
+
+ Change tab content to only show one at a time:
+ <TranscodeForm v-if="activeMode === 'transcode'" :config="transcode" />
+ <FilterForm v-if="activeMode === 'filters'" :config="filters" />
+ <ClipForm v-if="activeMode === 'clip'" :config="clip" />
+
+ For each form, wrap in a 3-column grid container. The form cards themselves need internal restructuring to use
+ columns.
+
+ Actually, the page-level grid should wrap the active form:
+ <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   <TranscodeForm v-if="activeMode === 'transcode'" :config="transcode" class="lg:col-span-3" />
+   <FilterForm v-if="activeMode === 'filters'" :config="filters" class="lg:col-span-3" />
+   <ClipForm v-if="activeMode === 'clip'" :config="clip" class="lg:col-span-3" />
+ </div>
+
+ Each form card internally restructures into 3 columns. For TranscodeForm, split fields into 3 logical groups:
+ - Col 1: Video Codec, Quality Mode/Value, Resolution, Framerate
+ - Col 2: Video Bitrate, Max Bitrate, Bufsize, Preset, Pixel Format
+ - Col 3: Audio Codec, Audio Bitrate, Output Format
+
+ For FilterForm, split into 3 columns:
+ - Col 1: Aspect Convert, Rotate, Crop
+ - Col 2: Watermark
+ - Col 3: Audio (Volume, Normalize, Speed)
+
+ For ClipForm, it's simpler - single column is fine, but can spread across 3 cols.
+
+ 7b. MergePage.vue - Add "Add to Queue" button
+
+ Add button at bottom that calls queue.addTasks() with merge file list:
+ import { useTaskQueue } from "../composables/useTaskQueue"
+ const queue = useTaskQueue()
+
+ async function handleAddMergeToQueue() {
+   if (merge.file_list.length < 2) return
+   await queue.addTasks(merge.file_list, toTaskConfig())
+ }
+
+ Add a button:
+ <div class="flex justify-end mt-2">
+   <button class="btn btn-primary btn-sm" :disabled="merge.file_list.length < 2" @click="handleAddMergeToQueue">
+     Add to Queue ({{ merge.file_list.length }} files)
+   </button>
+ </div>
+
+ 7c. AudioSubtitlePage.vue - Fullscreen drop zones
+
+ The AvsmixForm already restructured. Update page to use fullscreen drag overlay pattern.
+
+ ---
+ Step 8: Docs Updates
+
+ Update these docs files before coding:
+
+ 1. docs/fields/TranscodeConfig.csv - Add bufsize row, update audio_bitrate default
+ 2. docs/fields/MergeConfig.csv - Update target_resolution default to "1920x1080", target_fps default to 30
+ 3. docs/fields/FilterConfig.csv - Update speed validation to 0.25-4
+ 4. docs/BusinessRules.md - Add rules for quoting, bufsize, speed limit, mutual exclusion fix
+ 5. docs/Structure.md - Add bufsize field, note merge defaults
+ 6. docs/Procedure.md - Update merge flow with defaults, add mutual exclusion sequence
+ 7. references/PRD-2.1.0.md - Update Phase 3.5.1 status
+
+ ---
+ Files Modified (Summary)
+
+ ┌──────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────┐
+ │                       File                       │                            Action                             │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ core/models.py                                   │ Add bufsize to TranscodeConfig, update merge defaults         │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ core/command_builder.py                          │ Quote all paths, add bufsize support, fix speed range         │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ main.py                                          │ Add bufsize to add_tasks, update merge defaults               │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/types/config.ts                     │ Add bufsize to DTO                                            │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/composables/useGlobalConfig.ts      │ Add bufsize, update defaults                                  │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/TranscodeForm.vue │ Reorder fields, add bufsize, 3-col layout                     │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/FilterForm.vue    │ Fix freeze bug, crop desc, normalize align, speed range,      │
+ │                                                  │ 3-col                                                         │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/MergePanel.vue    │ Split resolution into W/H, update FPS default                 │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/ClipForm.vue      │ 3-col layout                                                  │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/config/AvsmixForm.vue    │ 2-col layout with fullscreen drop                             │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/components/common/FileDropInput.vue │ Add fullscreen-drop prop                                      │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/pages/CommandConfigPage.vue         │ Exclusive tab display                                         │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/pages/MergePage.vue                 │ Add "Add to Queue" button                                     │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ frontend/src/pages/AudioSubtitlePage.vue         │ Fullscreen drop support                                       │
+ ├──────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+ │ docs/                                            │ Update docs                                                   │
+ └──────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────┘
+
+ Verification
+
+ 1. cd frontend && bun run build -- no TypeScript or build errors
+ 2. Manual test items for:
+   - Merge page: W/H inputs default 1920x1080, FPS defaults to 30, "Add to Queue" works
+   - Config page: only one tab visible at a time
+   - TranscodeForm: field order VC-QM-QV-Res-FPS-VB-MB-buf-EP-PF
+   - Bufsize: editable, appears only when max_bitrate set
+   - Audio bitrate default 128k
+   - Rotate + Aspect Convert: selecting one clears the other, no freeze
+   - Crop: detailed description visible
+   - Normalize: label properly aligned
+   - Speed: range 0.25-4, error on invalid
+   - Command preview: paths with spaces properly quoted
+   - Watermark: fullscreen drag-drop works
+   - A/V Mix: audio and subtitle each half screen with drag-drop
+```
+
+### 修改任务
+
+```
+  Phase 3.5.1 完成
+
+  文档（docs-first原则）
+
+  - docs/fields/TranscodeConfig.csv - 添加 bufsize 字段，更新 audio_bitrate 默认值为 128k
+  - docs/fields/MergeConfig.csv - target_resolution 默认值改为 1920x1080，target_fps 改为 30
+  - docs/fields/FilterConfig.csv - 速度验证范围更新为 0.25-4
+  - docs/BusinessRules.md - 新增：bufsize 规则、音频码率默认值、滤镜互斥清理、变速范围、路径引用、更新页面布局规则
+  - docs/Structure.md - 新增 bufsize 字段、MergeConfig 默认值、3列布局、Merge 独立提交、全屏拖放
+  - docs/Procedure.md - 新增：滤镜互斥清理流程、Merge 独立提交流程
+  - references/PRD-2.1.0.md - 所有附录状态更新为 Phase 3.5.1 已同步
+
+  后端
+
+  - core/models.py - TranscodeConfig 添加 bufsize 字段；MergeConfig 默认值改为 1920x1080/30
+  - core/command_builder.py - 全部文件路径用 shlex.quote 引用；max_bitrate 支持 bufsize 配置；速度验证范围改为 0.25-4
+  - main.py - add_tasks 添加 bufsize 字段传递
+
+  前端
+
+  - types/config.ts - 添加 bufsize 字段
+  - useGlobalConfig.ts - audio_bitrate 默认 128k；添加 bufsize；merge 默认 1920x1080/30
+  - TranscodeForm.vue - 字段重排序(VC-QM-QV-Res-FPS-VB-MB-buf-EP-PF)，添加 Bufsize 输入，3列布局
+  - FilterForm.vue - 修复 Rotate/Aspect Convert 冻结 bug（watch 自动清理）；详细 crop 描述；标准化对齐修复；速度范围
+  0.25-4 + 前端警告；3列布局
+  - MergePanel.vue - TargetResolution 拆分为 W/H 双数字输入框
+  - FileDropInput.vue - 新增 fullscreenDrop prop，全屏拖放遮罩
+  - AvsmixForm.vue - 音频/字幕各占半屏，均启用全屏拖放
+  - CommandConfigPage.vue - 选项卡互斥显示（v-if 替代同时渲染）
+  - MergePage.vue - 添加 "Add to Queue" 按钮
+  - ClipForm.vue - 3列布局
+```
+
+### 问题
+
+- Queue界面无法上传文件了
+
+  - [TaskQueuePage] selected files: ['D:\\下载\\【翻唱】 セレナーデ（小夜曲） - 三枝明那_哔哩哔哩_bilibili-20260424_000655.mp4']
+    useTaskQueue.ts:69 [useTaskQueue] addTasks calling backend with 1 paths
+    useTaskQueue.ts:72 [useTaskQueue] add_tasks response: {"success":false,"error":"'NoneType' object has no attribute 'get'"}
+    useTaskQueue.ts:79 [useTaskQueue] add_tasks failed: 'NoneType' object has no attribute 'get'
+    (匿名) @ useTaskQueue.ts:79
+    await in (匿名)
+    handleAddFiles @ TaskQueuePage.vue:58
+    await in handleAddFiles
+    callWithErrorHandling @ runtime-core.esm-bundler.js:199
+    callWithAsyncErrorHandling @ runtime-core.esm-bundler.js:206
+    emit @ runtime-core.esm-bundler.js:4448
+    (匿名) @ runtime-core.esm-bundler.js:8325
+    (匿名) @ TaskToolbar.vue:22
+    callWithErrorHandling @ runtime-core.esm-bundler.js:199
+    callWithAsyncErrorHandling @ runtime-core.esm-bundler.js:206
+    (匿名) @ runtime-dom.esm-bundler.js:745
+    TaskQueuePage.vue:59 [TaskQueuePage] added tasks: 0
+
+- Config界面Transcode
+
+  - 切换到Config默认没有打开Transcode模块
+  - 默认音频码率没见有变成128k啊
+    - CommandConfigPage.vue:46 [Vue warn]: Invalid prop: type check failed for prop "supportedEncoders". Expected Array, got Object  
+        at <EncoderSelect model-value="libx264" category="video" supported-encoders= {encoders: Array(223)}  ... > 
+        at <TranscodeForm key=0 config= {video_codec: 'libx264', audio_codec: 'aac', video_bitrate: '', audio_bitrate: '128k', resolution: '', …} > 
+        at <CommandConfigPage onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< Proxy(Object) {__v_skip: true} > > 
+        at <RouterView> 
+        at <App>
+  - 排序还是有问题，变成三列之后Resolution和Framerate又到下面了，要求是这两项要显示在较上方的地方，Resolution也要拆分成两个输入框
+
+- Config界面Clip
+
+  - 排版有点问题，StartTime和EndTime应该对齐显示
+  - StartTime和EndTime应该任意有一个即可吧，没有强制要求两个都指定吧？
+  - 而且这几个应该都拆分成几个数据框，无需用户输入符号
+
+- Config界面Filters
+
+  - Aspect Ratio Convert仍然未能正确显示命令预览
+  - Aspect Ratio Convert选择后没有正确冻结Watermark
+
+- Merge界面
+
+  - 只保留Merge/Concatenate模块
+  - Intro/Outro模块挪到Config界面，确保其filtercomplex正确显示在命令预览里
+
+- Custom界面
+
+  - 目前优先级如何，应该是输入了参数就覆盖掉Config和A/V Mix配置的参数吧
+
+- 全屏支持拖拽仍然有问题，尤其是左右分屏并未实现
+
+  - Config界面Filters
+    - Aspect Ratio Convert未选择：全屏拖拽传入Watermark Image
+    - Aspect Ratio Convert选择后
+      - 背景黑色or背景模糊原片：隐藏Background Image区域+隐藏全屏拖拽
+      - 背景图片：全屏拖拽传入Background Image
+  - Config界面Intro/Outro，全屏均分左右两块拖拽区域
+    - 左半边传入Intro
+    - 右半边传入Outro
+  - A/V Mix界面，全屏均分左右两块拖拽区域
+    - 左半边传入Audio
+    - 右半边传入Subtitle
+  - Merge界面，全屏拖拽传入多文件合并的
+
+  请针对问题，先进行计划，修改PRD-2.1.0.md和相关docs\文档，再执行
+
+### Plan
+
+```
+     Phase 3.5.2: Bug Fixes & UX Improvements Plan
+
+     Context
+
+     Phase 3.5.1 implementation complete. User testing revealed new issues: Queue upload crash, supportedEncoders type
+     error, default tab not resetting, TranscodeForm Resolution positioning/split, ClipForm layout/time input split,
+     Aspect Convert watermark/command preview bugs, Intro/Outro page relocation, Custom mode description, and
+     comprehensive fullscreen drag-drop with split-screen zones.
+
+     ---
+     Issue Summary
+
+     ┌─────┬──────────────────┬──────────────────────────────────────────────┬──────────────────────────────────────────
+     ┐
+     │  #  │       Area       │                    Issue                     │                   Fix
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 1   │ Queue            │ 'NoneType' object has no attribute 'get'     │ Null safety for probe_file result
+     │
+     │     │                  │ when adding tasks                            │
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 2   │ Config/Transcode │ supportedEncoders prop type error (Object vs │ Backend returns {encoders:[]}, frontend
+     │
+     │     │                  │  Array)                                      │ must extract .encoders
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 3   │ Config           │ Default tab not transcode when navigating    │ Set activeMode.value = "transcode" in
+     │
+     │     │                  │ back                                         │ onMounted
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 4   │ Config/Transcode │ Resolution/Framerate too low in 3-col        │ Split into W/H inputs, reorder fields
+     │
+     │     │                  │ layout, Resolution not split                 │
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 5   │ Config/Transcode │ Audio bitrate 128k default not visible       │ Side effect of #2, fix #2 first
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 6   │ Config/Clip      │ StartTime/EndTime not aligned, time requires │ Side-by-side layout, split into
+     │
+     │     │                  │  manual colon input                          │ H:MM:SS:ms fields
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 7   │ Config/Clip      │ Both start and end should be optional        │ Already optional in backend, no code
+     │
+     │     │                  │                                              │ change needed
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 8   │ Config/Filters   │ Aspect Convert command preview not showing   │ Verify/fix command builder
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 9   │ Config/Filters   │ Aspect Convert not freezing Watermark        │ Disable watermark drop when
+     │
+     │     │                  │ FileDropInput                                │ aspect_convert active
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 10  │ Merge            │ Remove Intro/Outro, move to Config as new    │ New 4th tab in ConfigPage
+     │
+     │     │                  │ "Merge" tab                                  │
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 11  │ Custom           │ Priority unclear                             │ Add description text
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 12  │ Drag-Drop        │ Filters: watermark fullscreen drag           │ Add fullscreen-drop to watermark
+     │
+     │     │                  │                                              │ FileDropInput
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 13  │ Drag-Drop        │ Filters: aspect_convert context-dependent    │ Fullscreen drag for bg_image when needed
+     │
+     │     │                  │ drag                                         │
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 14  │ Drag-Drop        │ Config Intro/Outro: left/right split screen  │ Split-screen drop zones
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 15  │ Drag-Drop        │ A/V Mix: left/right split screen             │ Split-screen drop zones
+     │
+     ├─────┼──────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────
+     ┤
+     │ 16  │ Drag-Drop        │ Merge: fullscreen multi-file drag            │ Fullscreen drop for file list
+     │
+     └─────┴──────────────────┴──────────────────────────────────────────────┴──────────────────────────────────────────
+     ┘
+
+     ---
+     Step 1: Backend Fixes
+
+     1a. Fix Queue upload error (main.py:204-215)
+
+     Add null safety for probe_file result and per-file error handling:
+
+     for path in paths:
+         try:
+             info = probe_file(path) or {}
+             task = Task(
+                 file_path=info.get("file_path", path),
+                 file_name=info.get("file_name", ""),
+                 file_size_bytes=info.get("file_size_bytes", 0),
+                 duration_seconds=info.get("duration_seconds", 0.0),
+                 config=task_config,
+             )
+             tasks.append(task)
+         except Exception as probe_err:
+             logger.warning("probe_file failed for {}: {}", path, probe_err)
+             # Fallback: create task with minimal info
+             tasks.append(Task(
+                 file_path=path,
+                 file_name=Path(path).name,
+                 file_size_bytes=0,
+                 duration_seconds=0.0,
+                 config=task_config,
+             ))
+
+     1b. Fix check_hw_encoders return format (main.py:447-467)
+
+     Change to return the array directly:
+     return {"success": True, "data": encoders}
+
+     1c. Fix get_file_duration return format (main.py:469-486)
+
+     Change from {"duration": duration} to just duration:
+     return {"success": True, "data": duration}
+
+     Update ClipForm.vue to use res.data directly instead of res.data.duration.
+
+     1d. Verify aspect_convert command preview
+
+     In build_command_preview (command_builder.py:1015-1042), when activeMode is "filters" and aspect_convert is set,
+     the preview calls build_command which handles aspect_convert at line 934. This should work. Verify by tracing the
+     config flow: toTaskConfig() includes filters when mode is "filters" -> TaskConfig.from_dict creates FilterConfig
+     with aspect_convert -> build_command dispatches to aspect_convert handler. Should be working. If not, the issue
+     might be in validation step blocking the preview.
+
+     ---
+     Step 2: Frontend Core Fixes
+
+     2a. Fix supportedEncoders extraction (CommandConfigPage.vue:79-82)
+
+     Change:
+     const res = await call<string[]>("check_hw_encoders")
+     if (res.success && res.data) {
+       supportedEncoders.value = res.data
+     }
+     To:
+     const res = await call<string[]>("check_hw_encoders")
+     if (res.success && res.data) {
+       supportedEncoders.value = Array.isArray(res.data) ? res.data : (res.data as any).encoders ?? []
+     }
+
+     2b. Set default tab to transcode (CommandConfigPage.vue onMounted)
+
+     Add to existing onMounted:
+     activeMode.value = "transcode"
+
+     2c. Update toTaskConfig() for intro/outro (useGlobalConfig.ts)
+
+     When intro_path or outro_path is set, include merge config in task config even when mode isn't "merge":
+     merge: (mode === "merge" || merge.intro_path || merge.outro_path)
+       ? { ...merge } : undefined,
+
+     ---
+     Step 3: TranscodeForm Improvements
+
+     3a. Split Resolution into W/H inputs (TranscodeForm.vue)
+
+     Add computed get/set for resWidth/resHeight (same pattern as MergePanel):
+     const resWidth = computed({
+       get: () => {
+         const res = props.config.resolution
+         if (!res) return 0
+         return parseInt(res.split("x")[0]) || 0
+       },
+       set: (val: number | undefined) => {
+         const w = val || 0
+         const h = resHeight.value || 0
+         props.config.resolution = w && h ? `${w}x${h}` : ""
+       },
+     })
+     const resHeight = computed({
+       get: () => {
+         const res = props.config.resolution
+         if (!res) return 0
+         return parseInt(res.split("x")[1]) || 0
+       },
+       set: (val: number | undefined) => {
+         const w = resWidth.value || 0
+         const h = val || 0
+         props.config.resolution = w && h ? `${w}x${h}` : ""
+       },
+     })
+
+     3b. Reorder fields
+
+     New order within 3 columns:
+     - Col 1: Video Codec, Resolution (W x H), Framerate, Quality Mode, Quality Value
+     - Col 2: Video Bitrate, Max Bitrate, Bufsize, Encoding Preset, Pixel Format
+     - Col 3: Audio Codec, Audio Bitrate, Output Format
+
+     Move Resolution and Framerate up before Quality Mode/Value.
+
+     ---
+     Step 4: ClipForm Improvements
+
+     4a. Side-by-side StartTime/EndTime layout
+
+     Restructure from 3-column to a more compact layout:
+     - Row 1: Clip Mode select (full width)
+     - Row 2: StartTime and EndTime side by side (each half width)
+     - Row 3: Use Copy Codec toggle
+
+     4b. Split time into H:MM:SS:ms (4 number fields)
+
+     Create a reusable TimeInput inline pattern (not a separate component, just repeated):
+     <div class="flex items-center gap-1">
+       <input v-model.number="startH" type="number" min="0" max="99" placeholder="H" class="input input-bordered
+     input-sm w-14 text-center" />
+       <span class="text-xs">:</span>
+       <input v-model.number="startMM" type="number" min="0" max="59" placeholder="MM" class="input input-bordered
+     input-sm w-14 text-center" />
+       <span class="text-xs">:</span>
+       <input v-model.number="startSS" type="number" min="0" max="59" placeholder="SS" class="input input-bordered
+     input-sm w-14 text-center" />
+       <span class="text-xs">.</span>
+       <input v-model.number="startMs" type="number" min="0" max="999" placeholder="ms" class="input input-bordered
+     input-sm w-16 text-center" />
+     </div>
+
+     Use computed get/set to combine/split with config.start_time (format: H:MM:SS.mmm).
+
+     Both start and end are optional. Helper text: "Leave empty to skip".
+
+     ---
+     Step 5: FilterForm Improvements
+
+     5a. Freeze watermark when aspect_convert active
+
+     Add watch to clear watermark_path when aspect_convert is selected:
+     watch(() => props.config.aspect_convert, (val) => {
+       if (val) {
+         props.config.rotate = ""
+         props.config.watermark_path = ""
+       }
+     })
+
+     Add visual disabled state to watermark FileDropInput:
+     <div :class="{ 'opacity-50 pointer-events-none': hasAspectConvert }">
+       <FileDropInput ... />
+     </div>
+
+     5b. Add fullscreen-drop to watermark FileDropInput
+
+     Add fullscreen-drop prop to watermark FileDropInput when aspect_convert is not active.
+
+     5c. Aspect convert bg_image context
+
+     - When aspect_convert is active:
+       - If mode needs bg image (not blur/black): show bg_image FileDropInput with fullscreen-drop
+       - If mode is blur/black: hide bg_image area entirely
+     - When aspect_convert is not active: hide bg_image area
+
+     Check _build_aspect_convert_filter to see which modes need bg image. Looking at the modes: H2V-I (insert), H2V-T
+     (top/bottom bars), H2V-B (bottom padding), V2H-I, V2H-T, V2H-B. The "I" modes likely need bg image for padding. The
+      "T" and "B" modes use black bars.
+
+     ---
+     Step 6: Intro/Outro Move to Config Page
+
+     6a. Add "Merge" tab to CommandConfigPage
+
+     Update TABS array:
+     const TABS: { key: ActiveMode; label: string }[] = [
+       { key: "transcode", label: "Transcode" },
+       { key: "filters", label: "Filters" },
+       { key: "clip", label: "Clip" },
+       { key: "merge", label: "Merge" },
+     ]
+
+     6b. Update ActiveMode type
+
+     Add "merge" to ActiveMode type in types/config.ts:
+     export type ActiveMode = "transcode" | "filters" | "clip" | "merge" | "avsmix" | "custom"
+
+     6c. Create MergeSettings component for Config page
+
+     New component MergeSettingsForm.vue showing:
+     - Merge Mode select (ts_concat / concat_protocol / filter_complex)
+     - Target Resolution (W x H) and Target FPS (only for filter_complex)
+     - Intro Video FileDropInput
+     - Outro Video FileDropInput
+     - Fullscreen split drag for Intro (left) / Outro (right)
+
+     Note: The file_list stays on MergePage. Config page only has merge mode + intro/outro + filter_complex settings.
+
+     6d. Remove Intro/Outro from MergePage
+
+     Remove the entire Intro/Outro section from MergePage.vue. Keep only: MergePanel (mode + file list) + Add to Queue
+     button.
+
+     6e. Command preview for Intro/Outro on Config page
+
+     The command preview already uses toTaskConfig() which now includes merge data when intro/outro paths are set (from
+     2c). The build_command_preview function already handles merge with intro/outro at line 1032-1037. Should work
+     automatically.
+
+     However, the merge preview needs file_list (at least 2 files) to generate the command. When on Config page,
+     file_list is empty. Need to handle this: show a placeholder preview that indicates files are needed, or use a dummy
+      input file for the preview.
+
+     Fix: In build_command_preview, when merge has intro/outro but no file_list, show a preview with placeholder:
+     if config.merge and (config.merge.intro_path or config.merge.outro_path):
+         if len(config.merge.file_list) >= 2:
+             first_file = config.merge.file_list[0]
+         else:
+             first_file = "content_video.mp4"  # placeholder
+         args = build_merge_intro_outro_command(config, first_file, f"output{ext}")
+         return "ffmpeg " + " ".join(args)
+
+     ---
+     Step 7: Fullscreen Drag-Drop System
+
+     7a. Redesign FileDropInput.vue for split zones
+
+     Add new props:
+     dropZone?: "left" | "right"  // identifies which half of a split-screen drop
+     dropZoneLabel?: string        // label shown in the split overlay (e.g. "Intro", "Outro")
+
+     Add new page-level composable useSplitDrop.ts:
+     // Manages split-screen fullscreen drag coordination
+     // Components register as zones; first component adds document listeners
+     // Overlay shows left/right halves with labels
+     // Drop position determines which zone receives the file
+
+     7b. Implementation approach
+
+     Rather than a complex shared composable, use a simpler approach:
+     - Add dropZone and dropZoneLabel props to FileDropInput
+     - When fullscreenDrop is true and dropZone is set, the component checks mouse X position on drop
+     - If mouse is in the correct half (left/right), accept the file; otherwise ignore
+     - The overlay text shows the zone label
+     - Multiple FileDropInputs on the same page each add their own document listeners (only the first one shows the
+     overlay)
+
+     Actually, a better approach: Create a SplitDropZone wrapper component that:
+     - Takes left/right slot content
+     - Manages document-level drag events
+     - Shows a fullscreen split overlay when dragging
+     - Emits drop-left or drop-right events
+     - Children don't need individual fullscreen logic
+
+     <SplitDropZone
+       left-label="Intro Video"
+       right-label="Outro Video"
+       left-accept=".mp4,.mkv,.avi,.mov"
+       right-accept=".mp4,.mkv,.avi,.mov"
+       @drop-left="merge.intro_path = $event"
+       @drop-right="merge.outro_path = $event"
+     >
+       <template #left>
+         <FileDropInput :model-value="merge.intro_path" ... />
+       </template>
+       <template #right>
+         <FileDropInput :model-value="merge.outro_path" ... />
+       </template>
+     </SplitDropZone>
+
+     7c. Per-page drag configurations
+
+     ┌─────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────┐
+     │      Page       │                                         Configuration                                         │
+     ├─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────┤
+     │ Config/Filters  │ Watermark: fullscreen-drop (single zone). Aspect convert bg_image: conditional                │
+     │                 │ fullscreen-drop                                                                               │
+     ├─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────┤
+     │ Config/Merge    │ SplitDropZone: left=Intro, right=Outro                                                        │
+     │ tab             │                                                                                               │
+     ├─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────┤
+     │ A/V Mix         │ SplitDropZone: left=Audio, right=Subtitle                                                     │
+     ├─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────┤
+     │ Merge           │ Fullscreen single zone for file list (multi-file)                                             │
+     └─────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────┘
+
+     ---
+     Step 8: Custom Page Description
+
+     Add explanation text to CustomCommandPage.vue:
+     <p class="text-xs text-warning mb-2">
+       Custom mode has highest priority and completely bypasses Config and A/V Mix settings.
+       Only the input file and output path are handled automatically.
+     </p>
+
+     ---
+     Step 9: Docs Updates
+
+     Update before coding (document-first principle):
+
+     1. docs/BusinessRules.md - Add rules for split time input, split resolution, merge tab, split drag
+     2. docs/Structure.md - Note MergeSettingsForm, SplitDropZone, TimeInput pattern
+     3. docs/Procedure.md - Add Intro/Outro flow from Config page
+     4. docs/fields/TranscodeConfig.csv - Note resolution split to W/H
+     5. docs/fields/FilterConfig.csv - Note watermark freeze with aspect_convert
+     6. docs/fields/ClipConfig.csv - Note time split to H:MM:SS:ms
+     7. docs/fields/MergeConfig.csv - Note Intro/Outro moved to Config
+     8. references/PRD-2.1.0.md - Update Phase 3.5.2 status
+
+     ---
+     Files Modified (Summary)
+
+     ┌──────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────
+     ┐
+     │                         File                         │                          Action
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ main.py                                              │ Fix probe null safety, fix
+     │
+     │                                                      │ check_hw_encoders/get_file_duration return format
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/types/config.ts                         │ Add "merge" to ActiveMode type
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/composables/useGlobalConfig.ts          │ Include merge when intro/outro set
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/components/common/FileDropInput.vue     │ Add dropZone/dropZoneLabel props, split overlay
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/components/common/SplitDropZone.vue     │ NEW - Split-screen fullscreen drag wrapper
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/components/config/TranscodeForm.vue     │ Split Resolution W/H, reorder fields
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/components/config/FilterForm.vue        │ Freeze watermark, clear on aspect_convert,
+     │
+     │                                                      │ fullscreen-drop
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/components/config/ClipForm.vue          │ Side-by-side layout, H:MM:SS:ms split
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/components/config/MergeSettingsForm.vue │ NEW - Intro/Outro + merge settings for Config tab
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/pages/CommandConfigPage.vue             │ Add Merge tab, set default activeMode
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/pages/MergePage.vue                     │ Remove Intro/Outro section
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/pages/CustomCommandPage.vue             │ Add priority description
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ frontend/src/pages/AudioSubtitlePage.vue             │ Use SplitDropZone
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ core/command_builder.py                              │ Handle merge preview without file_list
+     │
+     ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────
+     ┤
+     │ docs/                                                │ Update docs
+     │
+     └──────────────────────────────────────────────────────┴───────────────────────────────────────────────────────────
+     ┘
+
+     Verification
+
+     1. cd frontend && bun run build -- no TypeScript or build errors
+     2. Manual test items for:
+       - Queue: upload file with Chinese filename succeeds
+       - Config: opens with Transcode tab by default
+       - Config/Transcode: Resolution shows W/H inputs, Framerate is near top
+       - Config/Transcode: Audio bitrate default 128k visible
+       - Config/Filters: Aspect Convert shows command preview
+       - Config/Filters: Selecting Aspect Convert clears and freezes watermark
+       - Config/Filters: Watermark fullscreen drag works
+       - Config/Filters: Aspect convert bg_image conditional drag
+       - Config/Clip: StartTime/EndTime side by side, each with H:MM:SS:ms
+       - Config/Merge tab: Intro/Outro with split-screen drag
+       - Config/Merge tab: Command preview shows intro/outro
+       - Merge page: Only file list + mode + add-to-queue
+       - A/V Mix: Left/right split-screen drag
+       - Custom: Priority description visible
+```
+
+### Summary of Changes
+
+```
+  Backend (3 files)
+
+  - main.py: Added null safety for probe_file() with per-file error handling; fixed check_hw_encoders to return string[]
+    directly (was {encoders: []}); fixed get_file_duration to return float directly (was {duration: float})
+  - core/command_builder.py: Merge preview now works with intro/outro even without file_list (uses placeholder)
+  - core/models.py: No changes needed (already correct)
+
+  Frontend Core (2 files)
+
+  - types/config.ts: ActiveMode already included "merge" (no change needed)
+  - composables/useGlobalConfig.ts: toTaskConfig() now includes merge config when intro/outro paths are set
+
+  Frontend Pages (5 files)
+
+  - CommandConfigPage.vue: Added 4th "Merge" tab, sets default activeMode to "transcode" on mount, fixed
+    supportedEncoders extraction
+  - MergePage.vue: Removed Intro/Outro section, simplified to just file list + mode + Add to Queue
+  - **AudioSubtitlePage.vue: Replaced AvsmixForm with inline SplitDropZone for left/right split-screen drag
+  - CustomCommandPage.vue: Added warning alert explaining Custom mode priority
+
+  Frontend Components (4 files)
+
+  - TranscodeForm.vue: Resolution split into W/H inputs, fields reordered (Resolution/Framerate moved up before Quality)
+  - ClipForm.vue: Side-by-side Start/End layout, time split into H:MM:SS:ms (4 number inputs), fixed get_file_duration
+    call
+  - FilterForm.vue: Watermark clears + freezes on aspect_convert, added fullscreen-drop to watermark FileDropInput,
+    bg_image only shown for I modes
+  - SplitDropZone.vue (NEW): Left/right split-screen fullscreen drag-drop wrapper component
+  - MergeSettingsForm.vue (NEW): Merge mode, filter_complex settings, Intro/Outro with SplitDropZone for Config page
+
+  Docs (7 files)
+
+  - Updated BusinessRules.md, Structure.md, Procedure.md, ClipConfig.csv, MergeConfig.csv, PRD-2.1.0.md
+
+  Verification
+
+  - Build: vue-tsc --noEmit && vite build -- 0 errors, 102 modules, built in 1.68s
+
+
+```
+
+### 问题
+
+- Queue界面仍然无法上传文件，请必须解决这个问题！！！！！！
+  - [TaskQueuePage] selected files: ['D:\\下载\\【翻唱】 セレナーデ（小夜曲） - 三枝明那_哔哩哔哩_bilibili-20260424_000655.mp4']
+    useTaskQueue.ts:69 [useTaskQueue] addTasks calling backend with 1 paths
+    useTaskQueue.ts:72 [useTaskQueue] add_tasks response: {"success":false,"error":"'NoneType' object has no attribute 'get'"}
+    useTaskQueue.ts:79 [useTaskQueue] add_tasks failed: 'NoneType' object has no attribute 'get'
+    (匿名) @ useTaskQueue.ts:79
+    await in (匿名)
+    handleAddFiles @ TaskQueuePage.vue:58
+    await in handleAddFiles
+    callWithErrorHandling @ runtime-core.esm-bundler.js:199
+    callWithAsyncErrorHandling @ runtime-core.esm-bundler.js:206
+    emit @ runtime-core.esm-bundler.js:4448
+    (匿名) @ runtime-core.esm-bundler.js:8325
+    (匿名) @ TaskToolbar.vue:22
+    callWithErrorHandling @ runtime-core.esm-bundler.js:199
+    callWithAsyncErrorHandling @ runtime-core.esm-bundler.js:206
+    (匿名) @ runtime-dom.esm-bundler.js:745
+    TaskQueuePage.vue:59 [TaskQueuePage] added tasks: 0
+- Config页
+  - Merge添加片头片尾应当支持只添加其中一个，并且默认模式选择FilterComplex
+  - 排序还是有问题，Resolution和Framerate是要在上面，但是QM和QV也要在上面啊，VB-MB-EP-PF这些在下面
+  - Filters模块Aspect Ratio Convert仍然未能正确显示命令预览
+  - Filters模块全屏支持拖拽仍然有问题
+    - Aspect Ratio Convert未选择：全屏拖拽传入Watermark Image
+    - Aspect Ratio Convert选择后
+      - 背景黑色or背景模糊原片：隐藏Background Image区域+隐藏全屏拖拽
+      - 背景图片：全屏拖拽传入Background Image
+- A/V Mix页两个区域不能点击弹出文件选择器选择了
+- Merge页
+  - 全屏拖拽未实现
+  - 文件识别错误，会出现ffmpeg -hide_banner -y -i 'D:\下载\【翻唱】 セレナーデ（小夜曲） - 三枝明那_哔哩哔哩_bilibili-20260424_000655.mp4' -i 'D:\下载\【翻唱】 セレナーデ（小夜曲） - 三枝明那_哔哩哔哩_bilibili-20260424_000655.mp4' -filter_complex [0:v]fps=30,scale=1920:1080,setsar=1[v0];[0:a]aformat=sample_rates=44100:channel_layouts=stereo[a0];[1:v]fps=30,scale=1920:1080,setsar=1[v1];[1:a]aformat=sample_rates=44100:channel_layouts=stereo[a1];[v0],[v1]concat=n=2:v=1:a=1[vout];[a0],[a1]concat=n=2:v=1:a=1[aout] -map [vout] -map [aout] -c:v av1_nvenc -c:a aac output.mp4这样输入文件识别成两个相同文件的问题，切换顺序之后能够识别正确了但是顺序是错的
+  - 添加三个文件之后命令预览还是只有两个文件
+  - 删除文件之后命令预览未更新
+- Config和A/V Mix页命令预览错误继承了Merge页的（Merge页的命令构建及预览应该是独立的， 并继承Config页编码相关设置；Config、A/V Mix和Custom页才应该是一致的）
+- Custom页输入参数后未能正确覆盖Config和A/V Mix页的参数
+
+请针对问题，先进行计划（计划中也要求先思考如何修改，再修改docs相关文档，最后在依据对文档的修改修改代码），修改PRD-2.1.0.md和相关docs\文档，再执行
+
+### Summary of All Fixes
+
+```
+  Issue 1: Queue upload broken (Critical)
+
+  - File: main.py
+  - Fix: Added parentheses around Python operator precedence bug: if clip_data and (clip_data.get("start_time") or
+    clip_data.get("end_time_or_duration")): was missing parentheses, causing None.get() error
+
+  Issue 2: Cross-mode contamination
+
+  - File: useGlobalConfig.ts
+  - Fix: configRef is now strictly mode-based - merge config is only included when activeMode === "merge", no longer
+    leaks into Config/A/V Mix pages via merge.intro_path || merge.outro_path
+
+  Issue 3: Merge Page independent preview
+
+  - File: MergePage.vue
+  - Fix: Builds its own mergePreviewConfig that inherits transcode + filters from shared state, adds merge-specific
+    config. Separates from other pages' preview.
+
+  Issue 4: Transcode field ordering
+
+  - File: TranscodeForm.vue
+  - Fix: Reorganized columns:
+    - Col 1: Core Video (Resolution, Framerate, Quality Mode, Quality Value)
+    - Col 2: Codecs (Video Codec, Audio Codec, Preset, Pixel Format)
+    - Col 3: Bitrate (Video Bitrate, Max Bitrate, Bufsize, Audio Bitrate, Output)
+
+  Issue 5: Aspect Ratio Convert preview + Filters drag-drop
+
+  - File: FilterForm.vue
+  - Fixes:
+    - Auto-fills default target_resolution when aspect_convert is selected
+    - Added fullscreenDropTarget computed to route fullscreen drops to correct target
+    - Watermark now uses v-if instead of class-disabling when aspect_convert is active
+    - Background Image gets fullscreen-drop only for Insert modes
+    - T/B modes show info text and have no fullscreen drop
+
+  Issue 6: Merge intro/outro + default FilterComplex
+
+  - File: useGlobalConfig.ts
+  - Fix: Added watch on merge.intro_path/outro_path that auto-switches merge_mode to "filter_complex" when either is set
+
+  Issue 7: A/V Mix click handlers
+
+  - File: AudioSubtitlePage.vue
+  - Fix: Added handleClickAudio() and handleClickSubtitle() calling select_files, wired @click to both card divs
+
+  Issue 8: Merge file dedup + fullscreen drop
+
+  - File: MergeFileList.vue
+  - Fixes:
+    - Added isInList() check to skip duplicate files when adding
+    - Added fullscreen drag-drop with document-level event handlers
+    - Shows fullscreen overlay when dragging
+
+  Issue 9: Merge filter_complex syntax for N files
+
+  - File: command_builder.py
+  - Fix: Removed commas between concat input labels: [v0][v1][v2]concat=n=3:v=1:a=1 (was [v0],[v1],[v2],concat=n=3 which
+    is invalid for N>2). Fixed in both build_merge_command and build_merge_intro_outro_command
+
+  Issue 10: Custom page override
+
+  - File: useGlobalConfig.ts, CustomCommandPage.vue
+  - Fix: Custom command raw_args is always included in configRef when non-empty, regardless of active mode. Custom page
+    now uses standard CommandPreview component with backend build_command_preview
+
+  These changes should address all 12 reported issues. You can test them by running the app and checking each affected
+  page.
+```
+
+### 问题
+
+- [重要！]现在无法合法处理非法文件名：对于“【翻唱】 セレナーデ（小夜曲） - 三枝明那_哔哩哔哩_bilibili-20260424_000655.mp4”文件
+
+  ```
+  －三枝明那_哗哩哗哩_bilibili-20260424_000655.mp4'.
+  Error opening input files: Illegal byte sequence
+  ```
+
+- Encoding Config的编排还是有点问题，我给你画个指示图，你按这样来排版
+
+  ```
+  VC----Resolution----AC
+  QM----Framerate----AB
+  QV----VB----OutputFormat
+  EP----MB
+  PF
+  ```
+
+- Config页的Merge片头尾添加功能仍有问题，需要设置为默认FilterComplex模式。并且只上传一个文件是命令预览的地方报错At least 2 files are required for merge.这个在添加头尾的地方不需要哈，不过删了这里不能影响Merge页的内容。
+
+- Config页的Merge Mode错误地与Merge页的Merge Mode同步了，应该是独立的
+
+- Config页的Merge上传文件两个区域不能点击弹出文件选择器选择了
+
+- Merge页的命令预览错误地与Config页的Merge片头尾添加功能共用了，导致merge页无法处理本页上传的文件，Merge页的命令预览应该是独立的，并且继承且只继承Config页的编码器设置
+
+- Merge页需要设置为默认Concat Protocol模式
+
+- Merge页添加文件应该得支持一个文件重复添加
+
+- Custom页删除掉OutputFormat模块
+
+### All Fixes Summary
+
+```
+  1. Illegal byte sequence for Unicode filenames (Critical)
+
+  - File: core/command_builder.py
+  - Root cause: shlex.quote() wraps file paths in single quotes ('path'). When passed as a list to subprocess.Popen, the
+   quotes become literal filename characters. On Windows with Unicode filenames (Japanese/Chinese), this causes "Illegal
+   byte sequence" errors.
+  - Fix: All _shlex.quote() calls replaced with _subprocess_quote() (a no-op that returns the path as-is). Subprocess
+  receives paths as list elements which handle Unicode natively.
+
+  2. Encoding Config layout redesign
+
+  - File: TranscodeForm.vue
+  - Fix: Reorganized to match user's diagram:
+  VC----Resolution----AC
+  QM----Framerate----AB
+  QV----VB----OutputFormat
+  EP----MB
+  PF
+  - Buffer Size placed below as full-width field.
+
+  3. Config Merge: click handlers + validation
+
+  - File: MergeSettingsForm.vue, command_builder.py
+  - Fix: Added handleClickIntro()/handleClickOutro() calling select_files. Added @click to both card divs. Validation no
+   longer shows "At least 2 files required" when intro/outro is set.
+
+  4. Merge page config isolation (Critical)
+
+  - File: MergePage.vue
+  - Fix: Merge page now uses its own local mergeConfig (reactive) instead of the global shared merge. Default mode:
+  concat_protocol. Preview is independent, only inherits transcode from Config.
+
+  5. Merge file duplicates allowed
+
+  - File: MergeFileList.vue
+  - Fix: Removed deduplication from both addFiles() and fullscreen drop handler. Duplicate files are no longer filtered
+  out.
+
+  6. Custom page - removed OutputFormat
+
+  - File: CustomCommandPage.vue
+  - Fix: Removed the Output Format card section and the associated EXTENSIONS constant.
+```
+
+### 问题
+
+- Config页的Merge功能一切界面就没了，怎么应用到队列中？
+- Merge页Concat Protocol和Ts Concat在命令预览中没差别啊，你是怎么设计的？
+- Merge页设置好添加到队列之后居然添加了两个视频到队列，合并不应该无论添加了多少视频都只有一个任务添加到队列中吗。此外，Merge页点击添加到队列之后应该跳转到Queue界面
+
+```
+  1. Config Merge Tab → Global intro/outro system
+
+  - MergeSettingsForm.vue: Removed Content Videos section and "Add to Queue" button. Now only shows intro/outro file
+  selection with a status indicator showing whether intro/outro is active.
+  - useGlobalConfig.ts: configRef now ALWAYS includes merge with intro_path/outro_path when either is set, regardless of
+   the current page's active mode. This means ALL tasks added from any page will have intro/outro settings applied.
+  - Works as: set intro/outro once on Config → ALL queue tasks automatically get wrapped with intro/outro.
+
+  2. MergePage clean config isolation
+
+  - MergePage.vue: handleAddToQueue now builds a fully clean TaskConfigDTO that only inherits transcode and filters from
+   shared state, completely excluding any global merge (intro/outro) settings. Preview and execution use the same
+  mergeConfig object.
+
+  3. Concat Protocol vs TS Concat implementation
+
+  - command_builder.py:
+    - concat_protocol: Uses -i "concat:file1|file2|..." -c copy (direct URL scheme — simplest, fastest)
+    - ts_concat: Uses -f concat -safe 0 -i list.txt -c copy (demuxer with file list — handles special chars better)
+    - Both now properly return paths without incorrect quoting
+```
+
+### 后续问题
+
+- 首先，当intro/outro的merge进行测试（仅上传片头或上传片头及片尾）时，FFMpeg报错
+
+  - 命令：21:40:37 | DEBUG    | core.ffmpeg_runner:run_single - Running: C:\Program Files\FFmpeg\ffmpeg.EXE -hide_banner -y -hide_banner -y -i D:\下载\【翻唱】 セレナーデ（小夜曲） - 三枝明那_哔哩哔哩_bilibili-20260424_000655.mp4 -i D:\下载\【翻唱】 セレナーデ（小夜曲） - 三枝明那_哔哩哔哩_bilibili-20260424_000655.mp4 -i D:\下载\【翻唱】 セレナーデ（小夜曲） - 三枝明那_哔哩哔哩_bilibili-20260424_000655.mp4 -filter_complex [0:v]fps=30,scale=1920:1080,setsar=1[v0];[0:a]aformat=sample_rates=44100:channel_layouts=stereo[a0];[1:v]fps=30,scale=1920:1080,setsar=1[v1];[1:a]aformat=sample_rates=44100:channel_layouts=stereo[a1];[2:v]fps=30,scale=1920:1080,setsar=1[v2];[2:a]aformat=sample_rates=44100:channel_layouts=stereo[a2];[v0][v1][v2]concat=n=3:v=1:a=1[vout];[a0][a1][a2]concat=n=3:v=1:a=1[aout] -map [vout] -map [aout] -c:v av1_nvenc -c:a aac D:\下载\【翻唱】 セレナーデ（小夜曲） - 三枝明那_哔哩哔哩_bilibili-20260424_000655-20260424_214037.mp4
+  - log报错：[Parsed_aformat_3 @ 0oooo2383399774o] Media type mismatch between the 'Parsed_aformat_3' filter output pad 0 (audio) and the 'Parsed_concat_13' filter input pad 0 (video)
+    [AVFilterGraph @ 00o00238339bd8co] Error linking filters
+    Error :Invalid argument
+
+- 其次，测试Merge页面的任务时发现添加到队列的任务执行的仍然是Config中配置的任务（不完全是，是Config中配置的任务很诡异地插入了Merge页面中上传的文件），而不是Merge中配置的任务
+
+  - Merge页中FC模式正确执行
+
+  - Merge页中ConcatProtocol正确传递了但是导出的视频只有第一个视频这一段长度
+
+  - Merge页中TSConcat模式未能正确执行
+
+    ```
+    21:52:07 | DEBUG    | core.ffmpeg_runner:run_single - Running: C:\Program Files\FFmpeg\ffmpeg.EXE -hide_banner -y -hide_banner -y -f concat -safe 0 -i list.txt -c copy D:\下载\【翻唱】 セレナーデ（小夜曲） - 三枝明那_哔哩哔哩_bilibili-20260424_000655-20260424_215207.mp4
+    21:52:07 | ERROR    | core.ffmpeg_runner:run_single - FFmpeg exited with code 4294967294 (task 213dfc878eea)
+    
+    [in#o @ ooooolfd8ac5deco] Error opening input: No such file or directory
+    Error opening input file list.txt.
+    Error opening input files: No such file or directory[in#o @ ooooolfd8ac5deco] Error opening input: No such file or directory
+    ```
+
+    Now both concat_protocol and ts_concat correctly use the concat demuxer with a temp list file. The task_runner.py  already handles creating/cleaning up the list file at runtime for both modes (since it checks merge.merge_mode ==  "ts_concat").
+
+### CC-Mem
+
+```
+egend: session-request | 🔴 bugfix | 🟣 feature | 🔄 refactor | ✅ change | 🔵 discovery | ⚖️ decision
+
+Apr 23, 2026
+
+#1614  3:25 AM  ✅  Phase 3 Development Initiated with Documentation Update
+     references/command_builder.md
+       #1615  3:26 AM  🔵  Phase 3 Preparation: System Documentation Review
+       #1616           🔵  Command Builder System Design Documentation Analyzed
+     main.py
+       #1617  3:27 AM  🔵  Current System Architecture and Configuration Classes Located
+     docs/Structure.md
+       #1618           🔵  Phase 2 System Architecture and Business Rules Documented
+     docs/fields/TranscodeConfig.csv
+       #1619           🔵  Current Configuration Schema Limited to Basic Codecs
+     references/command_builder.md
+       #1620           🔵  Bridge Architecture and Comprehensive Encoder Design Documentation Located
+     pywebvue/bridge.py
+       #1621  3:29 AM  🔵  PyWebVue Bridge Architecture Analyzed - No Command Builder Integration Found
+     docs/Structure.md
+       #1622           🔵  Phase 3 Preparation: Comprehensive Documentation Review Completed
+     core/command_builder.py
+       #1623  3:30 AM  🔵  build_command Function Usage Located Across Core Modules
+     main.py
+       #1624           🔵  build_command Integration Architecture Mapped
+     core/command_builder.py
+       #1625  3:31 AM  🔵  Phase 3 Preparation: Comprehensive Codebase Analysis Completed via Memory System
+     references/command_builder.md
+       #1626  3:34 AM  🔵  Phase 3 development preparation initiated
+     docs/fields/ClipConfig.csv
+       #1628  3:35 AM  🟣  Created ClipConfig.csv documentation file
+     docs/fields/AudioSubtitleConfig.csv
+       #1629           ✅  Phase 3 documentation tasks created
+     docs/fields/MergeConfig.csv
+       #1630           ✅  Additional Phase 3 documentation tasks planned
+     docs/fields/Encoder.csv
+       #1632  3:36 AM  🟣  Created Encoder.csv field definitions
+     docs/fields/MergeConfig.csv
+       #1633           🟣  Created three new Phase 3 configuration schemas
+     docs/fields/FilterConfig.csv
+       #1635           🟣  Added audio normalization and aspect conversion to FilterConfig
+     docs/fields/TranscodeConfig.csv
+       #1636           🟣  Expanded encoder support in TranscodeConfig
+     docs/Structure.md
+       #1637  3:37 AM  🟣  Added comprehensive Phase 3 architecture documentation to Structure.md
+       #1638           ✅  Updated frontend directory structure in Structure.md
+       #1639           ✅  Added encoder registry file to directory structure
+     docs/BusinessRules.md
+       #1642  3:39 AM  ✅  Added comprehensive Phase 3 business rules documentation
+     ..\..\Git\GithubManager\ff-intelligent-neo\docs\Procedure.md
+       #1644  3:44 AM  ✅  Added Phase 3 command construction flow documentation to Procedure.md
+     ..\..\Git\GithubManager\ff-intelligent-neo\references\PRD-2.1.0.md
+       #1645           🔵  Located Phase 3 documentation change requirements in PRD appendix
+       #1646           🔵  Identified complete Phase 3 documentation requirements from PRD appendix
+       #1647  3:45 AM  ✅  Updated PRD to document Phase 3 BusinessRules.md requirements
+       #1648           ✅  Updated PRD appendix to mark Phase 3 documentation as complete
+       
+     Legend: session-request | 🔴 bugfix | 🟣 feature | 🔄 refactor | ✅ change | 🔵 discovery | ⚖️ decision
+
+     Column Key
+       Read: Tokens to read this observation (cost to learn it now)
+       Work: Tokens spent on work that produced this record ( research, building, deciding)
+
+     Context Index: This semantic index (titles, types, files, tokens) is usually sufficient to understand past work.
+
+     When you need implementation details, rationale, or debugging context:
+       - Fetch by ID: get_observations([IDs]) for observations visible in this index
+       - Search history: Use the mem-search skill for past decisions, bugs, and deeper research
+       - Trust this index over re-reading code for past decisions and learnings
+
+     Context Economics
+       Loading: 50 observations (16,283 tokens to read)
+       Work investment: 0 tokens spent on research, building, and decisions
+
+     Apr 23, 2026
+
+     #S1 Audio transcoding parameter consistency fix - user requested explanation of changes made to ensure passed
+     parameters match command preview (Apr 23, 12:50 AM)
+
+     #S2 ComboInput component enhanced with improved filtering behavior (Apr 23, 12:54 AM)
+
+
+     Apr 24, 2026
+
+     PRD-2.1.0.md
+       #1773  10:50 AM  🟣  Video processing application UI/UX improvements planned
+     frontend/src/pages/MergePage.vue
+       #1774  10:52 AM  🔵  Video processing application architecture exploration for UI/UX improvements
+       #1775  10:54 AM  🔵  Video processing application UI/UX improvement planning phase completed
+       #1776  10:55 AM  🔵  Video processing application implementation planning completed
+     core/models.py
+       #1777  10:56 AM  🔵  Implementation planning phase examines existing data models and previous development plans
+     C:\Users\10411\.claude\plans\cosmic-seeking-pnueli.md
+       #1778  10:58 AM  ⚖️  Comprehensive Phase 3.5.1 implementation plan created for video processing application
+     improvements
+     General
+       #1779  11:02 AM  ⚖️  Planning phase completed and approved for implementation execution
+     ..\..\Git\GithubManager\ff-intelligent-neo\docs\fields\TranscodeConfig.csv
+       #1780  11:04 AM  ✅  Documentation updates initiated for Phase 3.5.1 implementation
+     frontend/src/components/TaskQueuePage.vue
+       #1781  12:00 PM  🔵  Queue file upload broken with NoneType error
+     frontend/src/components/CommandConfigPage.vue
+       #1782            🔵  Transcode configuration UI issues identified
+     General
+       #1783            🔵  Clip configuration form alignment issues
+       #1784            🔵  Filters Aspect Ratio and Watermark interaction broken
+       #1785            🔵  Merge interface needs restructuring
+       #1786            🔵  Custom interface parameter priority unclear
+       #1787            🔵  Full-screen drag-and-drop implementation incomplete
+     ..\..\Git\GithubManager\ff-intelligent-neo\main.py
+       #1788  12:02 PM  🔵  Backend add_tasks API structure analyzed
+     ..\..\Git\GithubManager\ff-intelligent-neo\core\file_info.py
+       #1789  12:03 PM  🔵  Root cause of Queue file upload NoneType error identified
+     frontend/src/pages/CommandConfigPage.vue
+       #1790            🔵  Frontend component architecture analyzed for reported issues
+     frontend/src/components/common/FileDropInput.vue
+       #1791            🔵  FileDropInput fullscreen drag-drop implementation exists
+     ..\..\Git\GithubManager\ff-intelligent-neo\core\file_info.py
+       #1792  12:04 PM  🔵  Queue upload error root cause identified in probe_file
+     frontend/src/components/common/FileDropInput.vue
+       #1793            🔵  Fullscreen drag-drop lacks split-screen zone support
+     frontend/src/components/config/FilterForm.vue
+       #1794            🔵  Watermark not auto-disabled when aspect_convert is active
+     frontend/src/pages/CustomCommandPage.vue
+       #1795            🔵  CustomCommandPage bypasses all other processing modes
+     frontend/src/components/config/MergePanel.vue
+       #1796            🔵  MergePanel already implements split target_resolution inputs
+     main.py
+       #1797  12:06 PM  🔵  Backend API structure for command preview and validation
+     core/models.py
+       #1798            🔵  Model from_dict methods safely handle missing keys with defaults
+     frontend/src/pages/MergePage.vue
+       #1799            🔵  MergePage structure and MergeFileList component analyzed
+     C:\Users\10411\.claude\plans\cosmic-seeking-pnueli.md
+       #1800  4:29 PM  🔵  Plan agent hit 5-hour usage rate limit
+     references/PRD-2.1.0.md
+       #1801  5:02 PM  ✅  Phase 3 Development Initiated
+     General
+       #1802           ✅  Frontend Build Verification Successful
+     ..\..\Git\GithubManager\ff-intelligent-neo\docs\BusinessRules.md
+       #1803  5:03 PM  ✅  Business Rules Documentation Updated for Phase 3.5.2
+     ..\..\Git\GithubManager\ff-intelligent-neo\docs\Structure.md
+       #1804           ✅  Bridge API Return Type Documentation Corrected
+       #1805           ✅  SplitDropZone Component Added to Documentation
+       #1806  5:04 PM  ✅  Component Documentation Updated for Phase 3.5.2
+       #1807           ✅  CommandConfigPage Architecture Updated for Phase 3.5.2
+       #1808  5:05 PM  ✅  SplitDropZone Component Documented and MergePage Simplified
+     ..\..\Git\GithubManager\ff-intelligent-neo\docs\fields\ClipConfig.csv
+       #1809  5:06 PM  ✅  ClipConfig Data Model Documentation Created
+     ..\..\Git\GithubManager\ff-intelligent-neo\docs\fields\MergeConfig.csv
+       #1810           ✅  MergeConfig Data Model Documentation Created with Architectural Changes
+     ..\..\Git\GithubManager\ff-intelligent-neo\references\PRD-2.1.0.md
+       #1811  5:07 PM  🔵  PRD Phase 3.5.1 Status Review Completed
+       #1812           ✅  Phase 3.5.2 Business Process Flows Documented in PRD
+       #1813           ✅  Phase 3.5.2 Documentation Status Marked as Synchronized
+     ..\..\Git\GithubManager\ff-intelligent-neo\docs\Procedure.md
+       #1814  5:08 PM  ✅  Intro/Outro Splicing Procedure Updated for Phase 3.5.2
+     General
+       #1815  5:51 PM  🔵  Queue add_tasks backend implementation revealed
+       #1816           🔵  Multi-page architecture revealed across frontend components
+       #1817           🔵  Queue upload failure root cause identified in add_tasks backend
+       #1818  5:52 PM  🔵  TaskQueuePage passes globalConfig.toTaskConfig() to backend addTasks
+       #1819           🔵  Command builder architecture identified in core/command_builder.py
+       #1820           🔵  Command preview dispatch order causes merge config to override other modes
+       #1821  5:53 PM  🔵  CommandConfigPage shares global config causing cross-mode contamination
+       #1822           🔵  Backend command building pipeline validates config via TaskConfig.from_dict
 ```
 

@@ -1,31 +1,52 @@
 <script setup lang="ts">
 /**
- * Page 2: Command Configuration
+ * Page: Command Configuration
  *
  * Global settings page for FFmpeg transcoding parameters.
  * Changes here are shared with the Task Queue page automatically.
- * No "Add to Queue" button -- the task queue reads these settings when adding files.
+ * Uses tab-based layout for Transcode, Filters, and Clip modes.
+ *
+ * Phase 3.5: Preview moved to top, only 3 tabs remain.
+ * Phase 3.5.1: Exclusive tab display (only one visible at a time).
  */
 
-import { ref, computed } from "vue"
+import { ref, computed, onMounted } from "vue"
 import { call } from "../bridge"
 import { useGlobalConfig } from "../composables/useGlobalConfig"
 import { useCommandPreview } from "../composables/useCommandPreview"
 import type { PresetDTO } from "../types/preset"
+import type { ActiveMode } from "../types/config"
 
 import TranscodeForm from "../components/config/TranscodeForm.vue"
 import FilterForm from "../components/config/FilterForm.vue"
+import ClipForm from "../components/config/ClipForm.vue"
+import MergeSettingsForm from "../components/config/MergeSettingsForm.vue"
 import CommandPreview from "../components/config/CommandPreview.vue"
 import PresetSelector from "../components/config/PresetSelector.vue"
 import PresetEditor from "../components/config/PresetEditor.vue"
 
-const { transcode, filters, toTaskConfig, loadFromTaskConfig, resetAll } =
-  useGlobalConfig()
+const {
+  transcode, filters, clip, merge,
+  activeMode, supportedEncoders,
+  toTaskConfig, loadFromTaskConfig, resetAll,
+} = useGlobalConfig()
+
 const configRef = computed(() => toTaskConfig())
 const { commandText, errors, warnings, validating } = useCommandPreview(configRef)
 
 const presetSelectorRef = ref<InstanceType<typeof PresetSelector> | null>(null)
 const showPresetEditor = ref(false)
+
+const TABS: { key: ActiveMode; label: string }[] = [
+  { key: "transcode", label: "Transcode" },
+  { key: "filters", label: "Filters" },
+  { key: "clip", label: "Clip" },
+  { key: "merge", label: "Merge" },
+]
+
+function handleTabClick(key: ActiveMode) {
+  activeMode.value = key
+}
 
 function handlePresetSelect(preset: PresetDTO) {
   loadFromTaskConfig(preset.config)
@@ -54,21 +75,31 @@ function handleReset() {
     presetSelectorRef.value.setSelectedId("")
   }
 }
+
+// Hardware encoder detection on mount
+onMounted(async () => {
+  activeMode.value = "transcode"
+  try {
+    const res = await call<string[]>("check_hw_encoders")
+    if (res.success && res.data) {
+      const arr = Array.isArray(res.data) ? res.data : []
+      supportedEncoders.value = arr
+    }
+  } catch {
+    // silently fail -- all encoders will be shown as available
+  }
+})
 </script>
 
 <template>
   <div class="flex flex-1 flex-col gap-4 p-4 overflow-y-auto">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <h1 class="text-xl font-bold">FFmpeg Command Configuration</h1>
-      <button class="btn btn-ghost btn-sm" @click="handleReset">
-        Reset All
-      </button>
-    </div>
-
-    <p class="text-xs text-base-content/60">
-      Settings on this page apply when adding files from the Task Queue.
-    </p>
+    <!-- Command Preview at TOP -->
+    <CommandPreview
+      :command-text="commandText"
+      :errors="errors"
+      :warnings="warnings"
+      :validating="validating"
+    />
 
     <!-- Preset Selector -->
     <PresetSelector
@@ -77,19 +108,44 @@ function handleReset() {
       @save="handlePresetSave"
     />
 
-    <!-- Two-column: Transcode + Filters -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <TranscodeForm :config="transcode" />
-      <FilterForm :config="filters" />
+    <!-- Tab Bar -->
+    <div class="tabs tabs-bordered" role="tablist">
+      <a
+        v-for="tab in TABS"
+        :key="tab.key"
+        class="tab text-sm"
+        :class="{ 'tab-active': activeMode === tab.key }"
+        role="tab"
+        @click="handleTabClick(tab.key)"
+      >
+        {{ tab.label }}
+      </a>
     </div>
 
-    <!-- Command Preview -->
-    <CommandPreview
-      :command-text="commandText"
-      :errors="errors"
-      :warnings="warnings"
-      :validating="validating"
+    <!-- Tab Content: Only show active tab -->
+    <TranscodeForm
+      v-if="activeMode === 'transcode'"
+      :config="transcode"
     />
+    <FilterForm
+      v-if="activeMode === 'filters'"
+      :config="filters"
+    />
+    <ClipForm
+      v-if="activeMode === 'clip'"
+      :config="clip"
+    />
+    <MergeSettingsForm
+      v-if="activeMode === 'merge'"
+      :config="merge"
+    />
+
+    <!-- Reset -->
+    <div class="flex justify-end">
+      <button class="btn btn-ghost btn-sm" @click="handleReset">
+        Reset All
+      </button>
+    </div>
 
     <!-- Preset Editor Modal -->
     <PresetEditor

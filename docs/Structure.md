@@ -16,11 +16,18 @@ ff-intelligent-neo/
 │   │   ├── bridge.ts       # PyWebVue Bridge 通信层
 │   │   ├── components/
 │   │   │   ├── common/     # 通用组件
-│   │   │   │   └── FileDropInput.vue  # 文件拖拽输入组件
+│   │   │   │   ├── FileDropInput.vue  # 文件拖拽输入组件
+│   │   │   │   └── SplitDropZone.vue  # 左右分屏全屏拖拽组件 (Phase 3.5.2)
 │   │   │   ├── layout/     # 布局组件
 │   │   │   │   └── AppNavbar.vue      # 导航栏（含主题切换、FFmpeg 状态）
 │   │   │   ├── config/     # 配置相关组件
-│   │   │   │   └── FilterForm.vue     # 滤镜配置表单
+│   │   │   │   ├── FilterForm.vue     # 滤镜配置表单
+│   │   │   │   ├── EncoderSelect.vue  # 编码器分组选择（Phase 3）
+│   │   │   │   ├── ClipForm.vue       # 视频剪辑配置（Phase 3, 3.5.2 时间拆分）
+│   │   │   │   ├── AvsmixForm.vue     # 音频字幕混合配置（Phase 3）
+│   │   │   │   ├── MergeFileList.vue  # 拼接文件列表（Phase 3）
+│   │   │   │   ├── MergePanel.vue     # 拼接配置面板（Phase 3）
+│   │   │   │   └── MergeSettingsForm.vue  # 拼接设置表单 - Config 页（Phase 3.5.2）
 │   │   │   ├── settings/   # 设置相关组件
 │   │   │   │   └── FFmpegSetup.vue    # FFmpeg 管理面板
 │   │   │   └── task-queue/ # 任务队列组件
@@ -28,12 +35,18 @@ ff-intelligent-neo/
 │   │   │       ├── TaskRow.vue        # 单行任务
 │   │   │       └── TaskProgressBar.vue # 进度条
 │   │   ├── composables/   # Vue Composables
+│   │   ├── data/          # 静态数据（Phase 3）
+│   │   │   └── encoders.ts         # 编码器注册表
 │   │   │   ├── useTaskControl.ts      # 任务控制 API
 │   │   │   ├── useSettings.ts         # 设置管理
 │   │   │   └── useTheme.ts            # 主题切换管理
+<!-- v2.1.0-CHANGE: Phase 3.5 新增页面组件 -->
 │   │   ├── pages/         # 页面组件
 │   │   │   ├── TaskQueuePage.vue
 │   │   │   ├── CommandConfigPage.vue
+│   │   │   ├── AudioSubtitlePage.vue  # 音频/字幕独立页面（Phase 3.5）
+│   │   │   ├── MergePage.vue          # 拼接独立页面（Phase 3.5）
+│   │   │   ├── CustomCommandPage.vue  # 自定义命令页面（Phase 3.5）
 │   │   │   └── SettingsPage.vue
 │   │   ├── types/         # TypeScript 类型定义
 │   │   └── style.css      # 全局样式（DaisyUI 主题配置）
@@ -81,6 +94,14 @@ ff-intelligent-neo/
 
 **使用场景**:
 - `FilterForm.vue` 中水印路径输入（accept: `.png,.jpg,.jpeg,.bmp,.webp`）
+- `FilterForm.vue` 中横竖屏背景图片路径输入（aspect_convert I 模式）
+
+**Phase 3.5.2-fixes: 上下文依赖的全屏拖拽**:
+- `FilterForm.vue` 新增 `fullscreenDropTarget` computed:
+  - 无 aspect_convert: 全屏拖拽 → Watermark
+  - aspect_convert I 模式 (H2V-I/V2H-I): 全屏拖拽 → Background Image
+  - aspect_convert T/B 模式: 无全屏拖拽
+- Watermark FileDropInput 使用 `v-if` 而非 `opacity + pointer-events-none`，确保 unmount 时 document 事件监听器被清理
 
 ## Composables
 
@@ -130,6 +151,23 @@ type ThemeValue = "auto" | "light" | "dark"
 | `retryTask` | `taskId, config?` | `retry_task` | 重试失败任务 |
 | `resetTask` | `taskId` | `reset_task` | 重置终态任务为 pending |
 | `stopAll` | - | `stop_all` | 终止所有任务 |
+
+### task_runner.py
+
+**路径**: `core/task_runner.py`
+
+**Phase 3.5.2-fixes 变更**:
+
+**start_task 配置保护**:
+- 启动任务时，来自前端的全局 config 仅更新 `transcode` + `filters`
+- 任务已有的子配置（`merge`, `clip`, `avsmix`, `custom_command`）被保留
+- 防止 Merge 页面任务的 merge.file_list 被全局 intro/outro 覆盖
+
+**Concat 列表文件管理**:
+- 检测 `merge.merge_mode in ("concat_protocol", "ts_concat")` 时自动创建临时列表文件
+- 列表文件格式: `file 'D:\path\to\file1.mp4'\nfile 'D:\path\to\file2.mp4'`
+- 临时文件路径替换 args 中的 `list.txt` 占位符
+- 任务执行完成后自动清理临时文件（通过 `try/finally`）
 | `pauseAll` | - | `pause_all` | 暂停所有任务 |
 | `resumeAll` | - | `resume_all` | 恢复所有任务 |
 
@@ -153,3 +191,422 @@ type ThemeValue = "auto" | "light" | "dark"
 
 **触发时机**: `main.py` 中 `switch_ffmpeg` 方法调用成功后
 **监听组件**: `AppNavbar.vue` — 更新导航栏 FFmpeg 状态徽标
+
+---
+
+## Phase 3: 命令构建功能完善
+
+<!-- v2.1.0-CHANGE: Phase 3 新增编码器数据库、命令构建扩展、新页面架构 -->
+
+### 编码器数据库
+
+<!-- v2.1.0-CHANGE: Phase 3 新增编码器注册表架构 -->
+
+前端维护一个完整的编码器注册表，按优先级分组展示，支持硬件编码器自动检测。
+
+**路径**: `frontend/src/data/encoders.ts`（新增）
+
+**类型定义**:
+```typescript
+interface EncoderConfig {
+  name: string              // FFmpeg 编码器名称
+  displayName: string        // 用户友好显示名
+  category: 'video' | 'audio'
+  hardwareType?: 'cpu' | 'nvidia' | 'amd' | 'intel'
+  recommendedQuality?: number // 推荐质量值
+  qualityMode?: 'crf' | 'cq' | 'qp'
+  description: string       // 使用建议
+  priority: 'P0' | 'P1' | 'P2' // 显示优先级
+}
+```
+
+**视频编码器分组**:
+
+| 优先级 | 编码器 | 硬件 | 推荐质量 | 模式 |
+|--------|--------|------|---------|------|
+| P0 | av1_nvenc | NVIDIA | 36 | cq |
+| P0 | libx265 | CPU | 24 | crf |
+| P0 | libsvtav1 | CPU | 32 | crf |
+| P1 | libx264 | CPU | 23 | crf |
+| P1 | hevc_nvenc | NVIDIA | 28 | cq |
+| P1 | h264_nvenc | NVIDIA | 28 | cq |
+| P1 | libvpx-vp9 | CPU | 31 | crf |
+| P2 | h264_amf | AMD | 34 | qp |
+| P2 | hevc_amf | AMD | 32 | qp |
+| P2 | h264_qsv | Intel | 28 | qp |
+| P2 | hevc_qsv | Intel | 30 | qp |
+| - | copy | - | - | - |
+| - | none | - | - | - |
+
+**音频编码器**:
+
+| 编码器 | 说明 | 推荐码率 |
+|--------|------|---------|
+| aac | 通用音频编码 | 192k |
+| opus | 开源高质量音频 | 128k |
+| flac | 无损音频 | - |
+| libmp3lame | MP3 | 320k |
+| alac | Apple Lossless | - |
+| copy | 不重编码 | - |
+| none | 移除音频 | - |
+
+**硬件编码器检测**:
+- Bridge API `check_hw_encoders()` 返回当前 FFmpeg 支持的编码器列表
+- 前端启动时调用一次，不支持硬件的编码器灰显或隐藏
+- 通过 `ffmpeg -encoders` 命令检测可用编码器
+
+### command_builder.py 扩展
+
+<!-- v2.1.0-CHANGE: Phase 3 更新命令构建器架构 -->
+
+**路径**: `core/command_builder.py`
+
+**现有架构**（保持不变）:
+- 注册表模式：`_transcode_params` 和 `_filters` 字典管理可扩展参数
+- 优先级排序：滤镜按 priority 数值排序构建链
+
+**Phase 3.5.2-fixes 路径引用变更**:
+- 移除所有 `shlex.quote()` 调用，替换为 `_subprocess_quote()`（no-op）
+- 原因：subprocess.Popen 以列表传递参数时不需要 shell 级别引用
+- `shlex.quote` 在 Windows 上产生单引号包裹，导致 Unicode 文件名报 "Illegal byte sequence"
+- 新增 `_subprocess_quote()` 和 `_preview_quote()` 辅助函数
+- 所有子 builder 函数移除 `-hide_banner -y`（由 `ffmpeg_runner.py` 统一添加）
+
+**Phase 3 新增滤镜**:
+
+| 滤镜 | 优先级 | 参数 | filter_complex |
+|------|--------|------|----------------|
+| audio_normalize | 16 | target_loudness, true_peak, lra | `loudnorm=I=-16:TP=-1.5:LRA=11` |
+| aspect_convert | 35 | mode, target_resolution, bg_image_path | 见横竖屏转换章节 |
+
+**Phase 3 新增命令构建函数**:
+
+| 函数 | 用途 | 命令模式 |
+|------|------|---------|
+| `build_clip_command()` | 视频剪辑（extract/cut） | `-ss -to -accurate_seek -i ...` |
+| `build_merge_command()` | 多视频拼接 | `-f concat` 或 `-filter_complex concat` |
+| `build_avsmix_command()` | 音频字幕混合 | `-map 0:v -map 1:a -map 2:s` |
+
+**VALID_VIDEO_CODECS 扩展**:
+```python
+VALID_VIDEO_CODECS = {
+    # CPU
+    "libx264", "libx265", "libsvtav1", "libvpx-vp9",
+    # NVIDIA
+    "av1_nvenc", "hevc_nvenc", "h264_nvenc",
+    # AMD
+    "h264_amf", "hevc_amf",
+    # Intel
+    "h264_qsv", "hevc_qsv",
+    # Special
+    "copy", "none",
+}
+```
+
+### 数据模型扩展 (models.py)
+
+<!-- v2.1.0-CHANGE: Phase 3 新增数据模型 -->
+
+**FilterConfig 新增字段**:
+```python
+@dataclass(frozen=True)
+class FilterConfig:
+    # ... existing fields ...
+    audio_normalize: bool = False
+    target_loudness: int = -16
+    true_peak: int = -1
+    lra: int = 11
+    aspect_convert: str = ""       # H2V-I, H2V-T, H2V-B, V2H-I, V2H-T, V2H-B
+    target_resolution: str = ""    # e.g. "1080x1920"
+    bg_image_path: str = ""
+```
+
+**新增数据模型**:
+```python
+@dataclass(frozen=True)
+class ClipConfig:
+    clip_mode: str = "extract"          # extract / cut
+    start_time: str = ""
+    end_time_or_duration: str = ""
+    use_copy_codec: bool = True
+
+@dataclass(frozen=True)
+class MergeConfig:
+    merge_mode: str = "ts_concat"       # ts_concat / concat_protocol / filter_complex
+    target_resolution: str = ""
+    target_fps: int = 0
+    transcode_config: dict = field(default_factory=dict)
+    intro_path: str = ""                # Phase 3.5: 片头视频路径
+    outro_path: str = ""                # Phase 3.5: 片尾视频路径
+
+@dataclass(frozen=True)
+class AudioSubtitleConfig:
+    external_audio_path: str = ""
+    subtitle_path: str = ""
+    subtitle_language: str = ""
+    replace_audio: bool = True
+
+<!-- v2.1.0-CHANGE: Phase 3.5 新增数据模型 -->
+@dataclass(frozen=True)
+class CustomCommandConfig:
+    raw_args: str = ""                  # 原始 FFmpeg 参数
+    output_extension: str = ".mp4"      # 输出文件扩展名
+```
+
+**TranscodeConfig 新增字段** (Phase 3.5):
+
+```python
+@dataclass(frozen=True)
+class TranscodeConfig:
+    # ... existing fields ...
+    quality_mode: str = ""       # "crf", "cq", "qp"
+    quality_value: int = 0       # CRF/CQ/QP 数值
+    preset: str = ""             # 编码速度预设 (ultrafast ~ veryslow)
+    pixel_format: str = ""       # 像素格式 (yuv420p, yuv420p10le, ...)
+    max_bitrate: str = ""        # 最大码率 (e.g. "8M")
+    bufsize: str = ""            # 缓冲区大小 (e.g. "2M"), Phase 3.5.1
+```
+
+**MergeConfig 默认值变更** (Phase 3.5.1):
+
+```python
+@dataclass(frozen=True)
+class MergeConfig:
+    target_resolution: str = "1920x1080"  # 默认 1920x1080 (原空字符串)
+    target_fps: int = 30                  # 默认 30 (原 0)
+```
+
+### 新增前端组件
+
+<!-- v2.1.0-CHANGE: Phase 3.5 重构页面布局 -->
+
+**命令配置页** (`CommandConfigPage.vue`):
+
+```
+CommandConfigPage (Phase 3.5 重构, Phase 3.5.1 互斥, Phase 3.5.2 新增 Merge 选项卡)
+  CommandPreview.vue      - 移至顶部（预设选择器之上）
+  PresetSelector.vue      - 预设管理
+  TabBar: [转码] [滤镜] [剪辑] [Merge]  (4 个选项卡，互斥显示, Phase 3.5.2)
+  TranscodeForm.vue      - 3 列布局，分辨率拆分为 W/H (Phase 3.5.2)
+  FilterForm.vue         - 3 列布局，水印冻结+全屏拖放 (Phase 3.5.2)
+  ClipForm.vue           - H:MM:SS:ms 时间拆分 (Phase 3.5.2)
+  MergeSettingsForm.vue  - Intro/Outro + 拼接设置 (Phase 3.5.2)
+```
+
+**音频/字幕独立页面** (`AudioSubtitlePage.vue`) (Phase 3.5 新增):
+
+```
+AudioSubtitlePage
+  CommandPreview.vue     - 独立命令预览
+  AvsmixForm.vue         - 音频/字幕各占半屏，全屏拖放 (Phase 3.5.1)
+```
+
+**拼接独立页面** (`MergePage.vue`) (Phase 3.5 新增, Phase 3.5.2 简化, Phase 3.5.2-fixes 隔离):
+
+```
+MergePage
+  CommandPreview.vue     - 独立命令预览（使用本地 mergeConfig，不是全局共享 merge）
+  MergePanel.vue         - 文件列表 + 拼接模式 (W/H 分离输入)
+  "Add to Queue" Button  - 添加 ONE 合并任务（非每个文件一个任务），自动跳转 Queue 页面
+```
+
+**配置隔离** (Phase 3.5.2-fixes):
+- 使用本地 `reactive<MergeConfigDTO>` 作为 merge 配置，不引用全局 `merge` 单例
+- 默认 merge_mode: `concat_protocol`
+- `handleAddToQueue` 构建纯净 config：仅继承全局 `transcode` + `filters`，不继承全局 `merge`（intro/outro）
+- 添加任务后通过 `router.push("/task-queue")` 自动跳转到 Queue 页面
+
+<!-- v2.1.0-CHANGE: Phase 3.5.2 新增 SplitDropZone 文档 -->
+
+**SplitDropZone 组件** (`SplitDropZone.vue`):
+
+左右分屏全屏拖拽包装组件。
+
+**路径**: `frontend/src/components/common/SplitDropZone.vue`
+
+**Props**:
+
+| Prop | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `leftLabel` | `string` | `"Left"` | 左半屏拖拽区标签 |
+| `rightLabel` | `string` | `"Right"` | 右半屏拖拽区标签 |
+| `leftAccept` | `string` | `""` | 左侧接受的文件扩展名 |
+| `rightAccept` | `string` | `""` | 右侧接受的文件扩展名 |
+
+**Events**:
+
+| 事件 | 参数 | 说明 |
+|------|------|------|
+| `drop-left` | `path: string` | 文件拖入左半屏时触发 |
+| `drop-right` | `path: string` | 文件拖入右半屏时触发 |
+
+**Slots**:
+
+| Slot | 说明 |
+|------|------|
+| `left` | 左半屏内容 |
+| `right` | 右半屏内容 |
+
+**行为**:
+- 注册 document 级 dragenter/dragover/dragleave/drop 事件监听
+- 拖入时显示全屏左右分屏遮罩，带标签提示
+- drop 时根据鼠标 X 坐标判断左/右半屏，触发对应事件
+- onUnmounted 清理事件监听
+
+**自定义命令页面** (`CustomCommandPage.vue`) (Phase 3.5 新增, Phase 3.5.2-fixes 改进):
+
+```
+CustomCommandPage
+  CommandPreview.vue     - 标准命令预览（通过 useCommandPreview + build_command_preview）
+  Raw Args Textarea      - 原始 FFmpeg 参数输入
+```
+
+**编码器选择组件** (`EncoderSelect.vue`):
+
+**路径**: `frontend/src/components/config/EncoderSelect.vue`
+
+| Prop | 类型 | 说明 |
+|------|------|------|
+| `modelValue` | `string` | 当前选中的编码器名称 |
+| `category` | `'video' \| 'audio'` | 编码器类别 |
+| `supportedEncoders` | `string[]` | 当前 FFmpeg 支持的编码器列表 |
+
+**Events** (Phase 3.5 扩展):
+
+| 事件 | 参数 | 说明 |
+|------|------|------|
+| `update:modelValue` | `value: string` | 编码器名称变更 |
+| `qualityChange` | `{ quality: number, mode: string } \| null` | 预设编码器的推荐质量值（自定义编码器返回 null） |
+
+**行为**:
+- 编码器按优先级分组显示（首选/次选/条件）
+- 不在 `supportedEncoders` 中的硬件编码器灰显并标注"未检测到"
+- 选择编码器后自动填充推荐质量值和质量模式到父组件
+<!-- v2.1.0-CHANGE: Phase 3.5 新增自定义编码器输入 -->
+- 底部提供 "Other (custom name)..." 选项，选中后显示文本输入框
+- 自定义编码器跳过硬件检测，不自动填充质量参数
+
+**文件列表面板** (`MergeFileList.vue`):
+
+**路径**: `frontend/src/components/config/MergeFileList.vue`
+
+| Prop | 类型 | 说明 |
+|------|------|------|
+| `modelValue` | `string[]` | 文件路径列表（v-model） |
+
+**行为** (Phase 3.5.2-fixes):
+- [添加文件] / [上移] / [下移] / [移除] 操作按钮
+- 每行显示序号、文件名、移除按钮
+- 支持拖拽排序（HTML5 drag-and-drop）
+- 支持全屏拖拽上传（document 级 drag 事件监听，80ms 延迟后调用 `get_dropped_files`）
+- 允许重复文件添加（不下重过滤）
+- 至少需要 2 个文件
+
+### Bridge API 新增
+
+<!-- v2.1.0-CHANGE: Phase 3 新增 Bridge API -->
+
+| 方法 | 参数 | 返回 | 说明 |
+|------|------|------|------|
+| `check_hw_encoders` | - | `string[]` | 检测 FFmpeg 支持的编码器列表（直接返回数组） |
+| `get_file_duration` | `file_path: str` | `float` | 获取文件时长（秒），直接返回数值 |
+
+| 修改方法 | 变更说明 |
+|---------|---------|
+| `build_command` | 支持 audio_normalize, aspect_convert, clip, avsmix, merge, custom_command 参数 |
+| `validate_config` | 增加新参数的验证规则 |
+
+---
+
+## Phase 3.5: 命令构建改进
+
+<!-- v2.1.0-CHANGE: Phase 3.5 新增命令构建改进架构 -->
+
+### 路由扩展
+
+| 路径 | 名称 | 组件 | 说明 |
+|------|------|------|------|
+| `/` | TaskQueue | `TaskQueuePage.vue` | 任务队列（不变） |
+| `/config` | CommandConfig | `CommandConfigPage.vue` | 转码/滤镜/剪辑（仅 3 个选项卡） |
+| `/audio-subtitle` | AudioSubtitle | `AudioSubtitlePage.vue` | 音频/字幕独立页面 |
+| `/merge` | Merge | `MergePage.vue` | 拼接独立页面 |
+| `/custom-command` | CustomCommand | `CustomCommandPage.vue` | 自定义命令页面 |
+| `/settings` | Settings | `SettingsPage.vue` | 设置（不变） |
+
+### command_builder.py Phase 3.5 扩展
+
+**新增转码参数注册**:
+
+| 参数 | 映射 | 条件 |
+|------|------|------|
+| quality_mode | `-crf N` / `-cq N` / `-qp N` | video_codec 非 copy/none |
+| preset | `-preset val` | video_codec 非 copy/none |
+| pixel_format | `-pix_fmt val` | video_codec 非 copy/none |
+| max_bitrate | `-maxrate val -bufsize N` | video_codec 非 copy/none, bufsize 可配置 (Phase 3.5.1) |
+| bufsize | `-bufsize val` (跟随 max_bitrate) | video_codec 非 copy/none (Phase 3.5.1) |
+
+**新增命令构建函数**:
+
+| 函数 | 用途 |
+|------|------|
+| `build_merge_intro_outro_command()` | 片头片尾拼接：3-input filter_complex concat |
+| `build_custom_command()` | 自定义命令：直接注入用户原始参数 |
+
+**命令构建优先级**: custom_command > clip > merge > 默认转码
+
+### TranscodeForm.vue 扩展 (Phase 3.5)
+
+**新增 UI 字段**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| Quality Mode | select | crf / cq / qp，自动填充 |
+| Quality Value | number | 0-51 数值，自动填充 |
+| Preset | select | ultrafast ~ veryslow |
+| Pixel Format | combo | yuv420p / yuv420p10le / yuv422p / yuv444p |
+| Max Bitrate | input | 最大码率，如 8M |
+| Buffer Size | input | 缓冲区大小，如 2M（Phase 3.5.1） |
+
+**字段顺序** (Phase 3.5.1 重新排序):
+
+VC -> QM -> QV -> Resolution -> Framerate -> VB -> MB -> Bufsize -> EP -> PF -> Audio -> Output
+
+**行为**:
+- 选择预设编码器时，`qualityChange` 事件自动填充 Quality Mode 和 Value
+- 切换到 copy/none 时清空所有质量字段
+- 自定义编码器不触发自动填充
+- Bufsize 仅在 Max Bitrate 已设置时显示（Phase 3.5.1）
+- 音频码率默认值改为 128k（Phase 3.5.1）
+
+---
+
+## Phase 3.5.1: Bug 修复与 UX 改进
+
+<!-- v2.1.0-CHANGE: Phase 3.5.1 新增 bug 修复与 UX 改进架构 -->
+
+### 路径引用
+
+所有命令构建函数（`build_command`, `build_clip_command`, `build_merge_command`, `build_avsmix_command`, `build_merge_intro_outro_command`, `build_custom_command`）统一使用 `shlex.quote()` 引用文件路径，确保含空格路径正确解析。
+
+### 滤镜互斥修复
+
+FilterForm 中 Rotate 和 Aspect Convert 互斥逻辑修改：
+- 使用 `watch` 自动清理：选择一方时清空另一方
+- 简化 disabled 条件，避免两个选项同时冻结
+
+### MergePanel 分辨率输入
+
+target_resolution 从单一文本输入改为 W x H 双数字输入框，默认值 1920x1080 通过 `computed` get/set 实现。
+
+### FileDropInput 全屏拖放
+
+新增 `fullscreenDrop` prop，启用后注册 document 级 drag 事件监听，拖入时显示全屏遮罩层（类似 TaskQueuePage 的 drag overlay），适用于水印和 A/V Mix 场景。
+
+### 页面布局变更
+
+| 页面 | 变更 |
+|------|------|
+| CommandConfigPage | 选项卡互斥显示，表单 3 列网格布局 |
+| MergePage | 新增 "Add to Queue" 按钮 |
+| AudioSubtitlePage | 音频/字幕各占半屏 |
+| FilterForm | 水印支持全屏拖放 |
