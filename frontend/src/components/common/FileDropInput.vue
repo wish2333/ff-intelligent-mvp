@@ -11,6 +11,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { call } from "../../bridge"
+import { toWebViewFileTypes } from "../../composables/useFileFormats"
 
 const { t } = useI18n()
 
@@ -129,7 +130,8 @@ async function onFullscreenDrop(e: DragEvent): Promise<void> {
 async function openFileDialog(): Promise<void> {
   error.value = ""
   try {
-    const res = await call<string>("select_file_filtered", "")
+    const fileTypes = toWebViewFileTypes(props.accept)
+    const res = await call<string>("select_file_filtered", fileTypes)
     if (res.success && res.data) {
       if (validateExtension(res.data)) {
         emit("update:modelValue", res.data)

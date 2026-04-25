@@ -1,0 +1,6 @@
+{
+  "audio": ".mp3,.aac,.flac,.wav,.m4a,.ogg,.wma, .m4s",
+  "subtitle": ".srt,.ass,.ssa, .vtt",
+  "video": ".mp4,.mkv,.avi,.mov,.ts,.m2ts, .m4v, .m4s, .rmvb, .wmv, .wmv, .mpg, .mpeg",
+  "image": ".png,.jpg,.jpeg,.bmp,.webp"
+}

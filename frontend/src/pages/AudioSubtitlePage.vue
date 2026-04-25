@@ -15,6 +15,9 @@ import { useGlobalConfig } from "../composables/useGlobalConfig"
 import { useCommandPreview } from "../composables/useCommandPreview"
 import SplitDropZone from "../components/common/SplitDropZone.vue"
 import CommandPreview from "../components/config/CommandPreview.vue"
+import { useFileFormats } from "../composables/useFileFormats"
+
+const { fileFormats } = useFileFormats()
 
 const { t } = useI18n()
 
@@ -68,8 +71,8 @@ onMounted(() => {
     <SplitDropZone
       :left-label="t('avMix.audio.title')"
       :right-label="t('avMix.subtitle.title')"
-      left-accept=".mp3,.aac,.flac,.wav,.m4a,.ogg,.wma"
-      right-accept=".srt,.ass,.ssa"
+      :left-accept="fileFormats.audio"
+      :right-accept="fileFormats.subtitle"
       @drop-left="handleDropAudio"
       @drop-right="handleDropSubtitle"
     >

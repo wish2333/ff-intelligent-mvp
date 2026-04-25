@@ -99,7 +99,7 @@ async function openFolder(path: string): Promise<void> {
 
     <!-- State badge -->
     <td>
-      <span :class="['badge badge-sm', stateBadgeClass[task.state] ?? 'badge-ghost']">
+      <span :class="['badge badge-sm whitespace-nowrap', stateBadgeClass[task.state] ?? 'badge-ghost']">
         {{ stateLabel[task.state] ?? task.state }}
       </span>
     </td>

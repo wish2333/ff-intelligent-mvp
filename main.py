@@ -9,6 +9,7 @@ import sys
 import threading
 
 import webview
+import json
 
 # Suppress pywebview deprecation warnings (FOLDER_DIALOG / OPEN_DIALOG)
 warnings.filterwarnings("ignore", message=".*deprecated.*", module="webview")
@@ -97,12 +98,15 @@ class FFmpegApi(Bridge):
     # ------------------------------------------------------------------
 
     @expose
-    def select_files(self) -> dict:
+    def select_files(self, file_types: list | None = None) -> dict:
         try:
-            result = self._window.create_file_dialog(
-                dialog_type=webview.FileDialog.OPEN,
-                allow_multiple=True,
-            )
+            kwargs: dict = {
+                "dialog_type": webview.FileDialog.OPEN,
+                "allow_multiple": True,
+            }
+            if file_types:
+                kwargs["file_types"] = tuple(file_types)
+            result = self._window.create_file_dialog(**kwargs)
             if result:
                 return {"success": True, "data": list(result)}
             return {"success": True, "data": []}
@@ -566,6 +570,22 @@ class FFmpegApi(Bridge):
             logger.exception("get_file_duration failed: {}", exc)
             return {"success": False, "error": str(exc)}
     @expose
+    def get_file_formats(self) -> dict:
+        """Return supported file formats from presets/file_formats.json."""
+        try:
+            from core.preset_manager import _get_default_presets_dir
+            presets_dir = _get_default_presets_dir()
+            fmt_path = presets_dir / "file_formats.json"
+            if fmt_path.exists():
+                with open(fmt_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return {"success": True, "data": data}
+            return {"success": False, "error": "file_formats.json not found"}
+        except Exception as exc:
+            logger.exception("get_file_formats failed: {}", exc)
+            return {"success": False, "error": str(exc)}
+
+    @expose
     def get_presets(self) -> dict:
         """Return all presets (defaults + user)."""
         try:
@@ -667,12 +687,13 @@ class FFmpegApi(Bridge):
             return {"success": False, "error": str(e)}
 
     @expose
-    def select_file_filtered(self, _file_types: str = "") -> dict:
-        """Open single-file dialog. Filtering is done on the frontend."""
+    def select_file_filtered(self, file_types: list | None = None) -> dict:
+        """Open single-file dialog with optional file type filtering."""
         try:
-            result = self._window.create_file_dialog(
-                dialog_type=webview.FileDialog.OPEN,
-            )
+            kwargs: dict = {"dialog_type": webview.FileDialog.OPEN}
+            if file_types:
+                kwargs["file_types"] = tuple(file_types)
+            result = self._window.create_file_dialog(**kwargs)
             if result and len(result) > 0:
                 return {"success": True, "data": result[0]}
             return {"success": True, "data": None}
@@ -770,7 +791,7 @@ if __name__ == "__main__":
         title="FF Intelligent Neo",
         width=1200,
         height=900,
-        min_size=(800, 600),
+        min_size=(1000, 600),
         frontend_dir="frontend_dist",
         on_closing=api._cleanup,
     )
