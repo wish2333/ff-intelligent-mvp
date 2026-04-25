@@ -70,6 +70,7 @@ class ValidationContext:
     """Extra context for parameter validation."""
     file_info: dict | None = None
     ffmpeg_version: str | None = None
+    preview_mode: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -426,17 +427,21 @@ _REGISTERED_FILTERS_OVERLAY = _register_filter(
     build_af=lambda val, fc, ctx: [],
     needs_complex=True,
     validate=lambda val, fc, ctx: (
-        (
-            [{"level": "error", "message": f"Watermark file not found: {val}"}]
-            if not Path(val).exists()
-            else (
-                [{"level": "error", "message": "Watermark must be an image file (png, jpg, bmp)"}]
-                if Path(val).suffix.lower() not in {".png", ".jpg", ".jpeg", ".bmp"}
-                else []
+        []
+        if ctx.preview_mode
+        else (
+            (
+                [{"level": "error", "message": f"Watermark file not found: {val}"}]
+                if not Path(val).exists()
+                else (
+                    [{"level": "error", "message": "Watermark must be an image file (png, jpg, bmp)"}]
+                    if Path(val).suffix.lower() not in {".png", ".jpg", ".jpeg", ".bmp"}
+                    else []
+                )
             )
+            if val
+            else []
         )
-        if val
-        else []
     ),
 )
 
@@ -1198,8 +1203,8 @@ def validate_config(
                 "message": "Subtitle language code is recommended for proper playback.",
             })
 
-    errors = [i["message"] for i in issues if i["level"] == "error"]
-    warnings = [i["message"] for i in issues if i["level"] == "warning"]
+    errors = [{"param": i.get("param", ""), "message": i["message"]} for i in issues if i["level"] == "error"]
+    warnings = [{"param": i.get("param", ""), "message": i["message"]} for i in issues if i["level"] == "warning"]
 
     return {"errors": errors, "warnings": warnings}
 

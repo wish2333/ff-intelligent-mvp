@@ -6,7 +6,7 @@ import { useLocale } from "../../composables/useLocale"
 import { useI18n } from "vue-i18n"
 
 const { t } = useI18n()
-const ffmpegReady = ref(false)
+const ffmpegStatus = ref<"unknown" | "ready" | "not_found">("unknown")
 const ffmpegVersion = ref("")
 const ffmpegError = ref("")
 const { resolveTheme, toggleTheme } = useTheme()
@@ -30,7 +30,7 @@ onMounted(async () => {
     "setup_ffmpeg",
   )
   if (setupRes.success && setupRes.data) {
-    ffmpegReady.value = setupRes.data.ready
+    ffmpegStatus.value = setupRes.data.ready ? "ready" : "not_found"
   } else {
     ffmpegError.value = setupRes.error ?? t("nav.ffmpegUnknownError")
   }
@@ -56,7 +56,7 @@ onMounted(async () => {
     path: string
     status: string
   }>("ffmpeg_version_changed", (detail) => {
-    ffmpegReady.value = detail.status === "ready"
+    ffmpegStatus.value = detail.status === "ready" ? "ready" : "not_found"
     ffmpegVersion.value = detail.version
     ffmpegError.value = ""
   })
@@ -112,10 +112,21 @@ onUnmounted(() => {
       <span
         class="badge badge-sm font-medium"
         :class="
-          ffmpegReady ? 'badge-success' : ffmpegVersion ? 'badge-warning' : 'badge-error'
+          ffmpegStatus === 'ready'
+            ? 'badge-success'
+            : ffmpegStatus === 'not_found'
+              ? ffmpegVersion
+                ? 'badge-warning'
+                : 'badge-error'
+              : 'badge-ghost'
         "
       >
-        {{ ffmpegReady ? (ffmpegVersion ? `FFmpeg ${ffmpegVersion}` : t("nav.ffmpegReady")) : (ffmpegError || t("nav.ffmpegNotFound")) }}
+        {{ ffmpegStatus === 'ready'
+          ? (ffmpegVersion ? `FFmpeg ${ffmpegVersion}` : t("nav.ffmpegReady"))
+          : ffmpegStatus === 'not_found'
+            ? (ffmpegError || t("nav.ffmpegNotFound"))
+            : t("nav.ffmpegChecking")
+        }}
       </span>
     </div>
   </div>

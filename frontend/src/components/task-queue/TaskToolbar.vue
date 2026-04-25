@@ -2,11 +2,12 @@
 /**
  * Task toolbar with add/remove/clear actions and select-all checkbox.
  */
+import { ref } from "vue"
 import { useI18n } from "vue-i18n"
 
 const { t } = useI18n()
 
-defineProps<{
+const props = defineProps<{
   selectedCount: number
   totalCount: number
   isAllSelected: boolean
@@ -19,6 +20,36 @@ const emit = defineEmits<{
   clearAll: []
   toggleSelectAll: []
 }>()
+
+const confirmDialog = ref<HTMLDialogElement | null>(null)
+const pendingAction = ref<"removeSelected" | "clearAll" | null>(null)
+const confirmTitle = ref("")
+const confirmMessage = ref("")
+
+function requestRemoveSelected() {
+  if (props.selectedCount === 0) return
+  pendingAction.value = "removeSelected"
+  confirmTitle.value = t("common.removeTasks")
+  confirmMessage.value = t("common.removeTasksConfirm", { count: props.selectedCount })
+  confirmDialog.value?.showModal()
+}
+
+function requestClearAll() {
+  pendingAction.value = "clearAll"
+  confirmTitle.value = t("common.clearQueue")
+  confirmMessage.value = t("common.clearQueueConfirm")
+  confirmDialog.value?.showModal()
+}
+
+function handleConfirm() {
+  confirmDialog.value?.close()
+  if (pendingAction.value === "removeSelected") {
+    emit("removeSelected")
+  } else if (pendingAction.value === "clearAll") {
+    emit("clearAll")
+  }
+  pendingAction.value = null
+}
 </script>
 
 <template>
@@ -37,7 +68,7 @@ const emit = defineEmits<{
     <button
       class="btn btn-sm btn-ghost"
       :disabled="selectedCount === 0"
-      @click="emit('removeSelected')"
+      @click="requestRemoveSelected"
     >
       {{ t("taskQueue.toolbar.removeSelected", { count: selectedCount }) }}
     </button>
@@ -51,7 +82,7 @@ const emit = defineEmits<{
 
     <button
       class="btn btn-sm btn-ghost text-error"
-      @click="emit('clearAll')"
+      @click="requestClearAll"
     >
       {{ t("taskQueue.toolbar.clearAll") }}
     </button>
@@ -63,10 +94,24 @@ const emit = defineEmits<{
         type="checkbox"
         class="checkbox checkbox-sm checkbox-primary"
         :checked="isAllSelected"
-        :disabled="totalCount === 0"
         @change="emit('toggleSelectAll')"
       />
-      {{ t("taskQueue.toolbar.selectAll") }}
+      <span class="text-base-content/60">
+        {{ selectedCount }}/{{ totalCount }}
+      </span>
     </label>
   </div>
+
+  <!-- Confirmation modal -->
+  <dialog ref="confirmDialog" class="modal">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg">{{ confirmTitle }}</h3>
+      <p class="py-4">{{ confirmMessage }}</p>
+      <div class="modal-action">
+        <button class="btn btn-ghost" @click="confirmDialog?.close()">{{ t("common.cancel") }}</button>
+        <button class="btn btn-error" @click="handleConfirm()">{{ t("common.confirm") }}</button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  </dialog>
 </template>

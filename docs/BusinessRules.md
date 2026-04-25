@@ -1,8 +1,10 @@
 # 业务规则
 
-## 日志生命周期规则
+## 日志规则
 
 <!-- v2.1.0-CHANGE: 行5-行30 新增日志生命周期规则 -->
+
+### 日志生命周期
 
 | 场景 | 行为 |
 |------|------|
@@ -20,7 +22,23 @@
 - 每个任务最多保留 100 行日志（`log_lines` 数组上限）
 - 日志仅在内存中维护，不持久化到磁盘文件
 
-## Download FFmpeg 二次确认规则
+---
+
+## FFmpeg 管理规则
+
+### FFmpeg 版本切换事件规则
+
+<!-- v2.1.0-CHANGE: 行55-行68 新增版本切换事件规则 -->
+
+| 规则 | 说明 |
+|------|------|
+| 事件名称 | `ffmpeg_version_changed` |
+| 触发时机 | `switch_ffmpeg` 后端方法调用成功时 |
+| 事件数据 | `{ version: string, path: string, status: 'ready' }` |
+| 前端监听 | `AppNavbar.vue` 通过 `onEvent` 监听此事件 |
+| 更新内容 | 导航栏 FFmpeg 状态徽标实时更新版本号和状态 |
+
+### FFmpeg 下载二次确认规则
 
 <!-- v2.1.0-CHANGE: 行35-行50 新增下载确认规则 -->
 
@@ -33,19 +51,48 @@
 | 加载状态 | 下载中按钮显示 loading spinner，禁用点击，5 秒后自动恢复 |
 | 检测中禁用 | FFmpeg 正在检测时（status=detecting），下载按钮禁用 |
 
-## FFmpeg 版本切换事件规则
+### FFmpeg 下载按钮平台规则
 
-<!-- v2.1.0-CHANGE: 行55-行68 新增版本切换事件规则 -->
+<!-- v2.1.0-CHANGE: Phase 4 新增规则 -->
 
-| 规则 | 说明 |
-|------|------|
-| 事件名称 | `ffmpeg_version_changed` |
-| 触发时机 | `switch_ffmpeg` 后端方法调用成功时 |
-| 事件数据 | `{ version: string, path: string, status: 'ready' }` |
-| 前端监听 | `AppNavbar.vue` 通过 `onEvent` 监听此事件 |
-| 更新内容 | 导航栏 FFmpeg 状态徽标实时更新版本号和状态 |
+| 平台 | 行为 | 说明 |
+|------|------|------|
+| Windows (win32) | 显示 "Download FFmpeg" 按钮 | 使用 static_ffmpeg 包下载预编译二进制 |
+| macOS (darwin) | 显示 homebrew 安装提示 | "brew install ffmpeg"，附带 brew.sh 链接 |
+| Linux (ubuntu/debian) | 显示 apt 安装提示 | "sudo apt install ffmpeg" |
+| Linux (fedora) | 显示 dnf 安装提示 | "sudo dnf install ffmpeg" |
+| Linux (arch/manjaro) | 显示 pacman 安装提示 | "sudo pacman -S ffmpeg" |
+| Linux (其他) | 显示通用提示 | "Install ffmpeg via your package manager" |
+| 打包环境 | 所有平台禁用下载 | is_frozen() 时 static_ffmpeg 不可用 |
+| 后端守卫 | download_ffmpeg() 检查 sys.platform | 非 Windows 返回 download_not_supported 错误 + 安装指引 |
 
-## Reset 行为规则
+### FFmpeg 下载超时规则
+
+<!-- v2.1.0-CHANGE: Phase 5 初始规则 -->
+<!-- v2.1.1-CHANGE: 行424-末尾 修改超时规则，从固定超时改为事件驱动 -->
+
+| 规则 | v2.1.0 | v2.1.1 |
+|------|--------|--------|
+| 超时方式 | `setTimeout(() => isDownloading = false, 5000)` 固定 5 秒 | 移除固定超时 |
+| 完成检测 | 无 | 监听 `ffmpeg_version_changed` 事件，收到 `status: "ready"` 后恢复按钮 |
+| 失败处理 | 无 | 监听 `ffmpeg_version_changed` 事件中 `status: "not_found"` 或收到错误时恢复按钮 + 显示错误 |
+| 加载状态 | 5 秒后自动恢复 spinner | 事件驱动，下载真正完成/失败后才恢复 |
+
+### FFmpeg 状态徽标初始值规则
+
+<!-- v2.1.1-CHANGE: 新增 FFmpeg badge 初始状态规则 -->
+
+| 规则 | v2.1.0 | v2.1.1 |
+|------|--------|--------|
+| 初始状态 | `not_found`（红色） | `unknown`（灰色） |
+| 闪烁问题 | mount 时从红色闪烁到绿色 | 仅在校验完成后设为 ready/not_found |
+| 颜色映射 | ready=绿, not_found=红 | unknown=灰, ready=绿, not_found=红 |
+
+---
+
+## 任务状态规则
+
+### Reset 行为规则
 
 <!-- v2.1.0-CHANGE: 行73-行88 新增 Reset 业务规则 -->
 
@@ -57,6 +104,55 @@
 | 数据清理 | 清空：error, log_lines, output_path, progress, started_at, completed_at |
 | 数据保留 | 保留：id, file_path, file_name, file_size_bytes, duration_seconds, config |
 | 前端触发 | `useTaskControl.ts` 的 `resetTask(id)` 调用后端 `reset_task(id)` |
+
+### 任务状态变更重新获取规则
+
+<!-- v2.1.0-CHANGE: Phase 5 新增 -->
+
+| 规则 | 说明 |
+|------|------|
+| 触发条件 | `task_state_changed` 事件中 `new_state === "completed"` 或 `new_state === "failed"` |
+| 行为 | 调用 `fetchTasks()` 完整重新获取任务列表 |
+| 原因 | `task_state_changed` 事件仅携带 `{task_id, old_state, new_state}`，不包含 `output_path` 等后端更新的字段 |
+| 影响范围 | 确保 completed 任务立即显示 output_path（用于打开文件夹按钮），failed 任务立即显示 error 信息 |
+
+### 任务按钮尺寸规则
+
+<!-- v2.1.0-CHANGE: Phase 5 新增 -->
+
+| 规则 | 说明 |
+|------|------|
+| 统一尺寸 | 所有任务操作按钮（Start, Pause, Resume, Stop, Retry, Reset, Log, Open Folder, Move Up/Down）统一使用 `btn-sm` |
+| 批量按钮 | BatchControlBar 中所有按钮（Start All, Pause All, Resume All, Stop All）统一使用 `btn-sm` |
+| 禁用按钮 | Move Up/Down 的 `btn-xs btn-ghost btn-square` 也升级为 `btn-sm` |
+| 设计理念 | 重要操作按钮不应过小，`btn-sm` 是 DaisyUI 中适合操作按钮的最小尺寸 |
+
+### 队列表格布局规则
+
+<!-- v2.1.0-CHANGE: Phase 5 新增 -->
+
+| 规则 | 说明 |
+|------|------|
+| 无横向滚动 | 表格容器使用 `overflow-hidden`，禁止出现横向滚动条 |
+| 信息列移除 | 移除原有的"信息"列（duration/file_size 信息合并到文件名列中） |
+| 列宽约束 | Checkbox: `w-10 shrink-0`, State: `w-20 shrink-0`, Progress: `w-44 shrink-0`, Actions: `w-52 shrink-0` |
+| 文件列弹性 | 文件名列 `min-w-0`，自动填充剩余空间，内部使用 `truncate` 截断长文件名 |
+| 操作列固定 | Actions 列 `w-52 shrink-0 whitespace-nowrap`，确保按钮不换行跳位 |
+
+### 打开文件夹规则
+
+<!-- v2.1.0-CHANGE: Phase 5 新增 -->
+
+| 规则 | 说明 |
+|------|------|
+| 显示条件 | 仅 `completed` 状态且 `output_path` 非空的任务显示"打开文件夹"按钮 |
+| 跨平台 | Windows: `os.startfile(folder)`, macOS: `subprocess.Popen(["open", folder])`, Linux: `subprocess.Popen(["xdg-open", folder])` |
+| 路径解析 | 若 path 是文件则打开其所在目录（`os.path.dirname`），若 path 是目录则直接打开 |
+| 按钮样式 | `btn btn-sm btn-ghost`，文本按钮（显示 `t("taskQueue.actions.openFolder")`） |
+| Bridge API | `open_folder(path: str) -> {success, error?, data: null}` |
+| 静默失败 | 前端调用失败时 silently fail（不弹错误提示） |
+
+---
 
 ## 主题切换规则
 
@@ -71,7 +167,9 @@
 | 实时监听 | auto 模式下监听 `matchMedia` change 事件，系统主题变化时自动更新 |
 | UI 入口 | 导航栏右侧太阳/月亮图标按钮，`toggleTheme()` 在 light/dark 间切换 |
 
-## 文件拖拽输入规则
+---
+
+## 文件拖拽规则
 
 <!-- v2.1.0-CHANGE: 行113-行130 新增 FileDropInput 规则 -->
 
@@ -88,11 +186,11 @@
 
 ---
 
-## Phase 3: 命令构建功能业务规则
-
-<!-- v2.1.0-CHANGE: Phase 3 新增命令构建相关业务规则 -->
+## 命令构建规则
 
 ### 编码器选择规则
+
+<!-- v2.1.0-CHANGE: Phase 3 新增命令构建相关业务规则 -->
 
 | 规则 | 说明 |
 |------|------|
@@ -104,9 +202,9 @@
 | 质量值范围 | CRF: 0-51, CQ: 0-51, QP: 0-51, 0=无损/最高质量 |
 | 编码器验证 | `validate_config` 校验编码器名称是否在 VALID_VIDEO/AUDIO_CODECS 集合中 |
 
-<!-- v2.1.0-CHANGE: Phase 3.5 新增自定义编码器输入规则 -->
-
 ### 自定义编码器输入规则
+
+<!-- v2.1.0-CHANGE: Phase 3.5 新增自定义编码器输入规则 -->
 
 | 规则 | 说明 |
 |------|------|
@@ -143,9 +241,9 @@
 | 两遍模式 | Phase 3 使用单遍 loudnorm（简化实现），如需精确归一化后续可扩展为两遍 |
 | 音频码率默认 | audio_bitrate 默认值从 Phase 3.5.1 起改为 128k（原 192k） |
 
-<!-- v2.1.0-CHANGE: Phase 3.5.1 新增滤镜互斥清理规则 -->
-
 ### 滤镜互斥清理规则
+
+<!-- v2.1.0-CHANGE: Phase 3.5.1 新增滤镜互斥清理规则 -->
 
 | 规则 | 说明 |
 |------|------|
@@ -220,9 +318,9 @@
 | 临时列表文件 | concat demuxer 的 `list.txt` 由 `task_runner.py` 在运行时创建，任务完成后自动清理 |
 | 与其他功能互斥 | 拼接功能独立，不在同一命令中叠加转码/滤镜/剪辑配置 |
 
-<!-- v2.1.0-CHANGE: Phase 3.5 新增片头片尾规则 -->
-
 ### 拼接片头片尾规则
+
+<!-- v2.1.0-CHANGE: Phase 3.5 新增片头片尾规则 -->
 
 | 规则 | 说明 |
 |------|------|
@@ -238,22 +336,9 @@
 | Merge 页面隔离 | Merge 页面的 merge_config 与 Config 页面的 intro/outro 设置完全独立，互不影响 |
 | Task Config 保护 | `start_task` 在更新配置时保留任务已有的子配置，避免 intro/outro 覆盖 merge 任务配置 |
 
-<!-- v2.1.0-CHANGE: Phase 3.5 新增页面布局规则 -->
-
-### 页面布局规则
-
-| 规则 | 说明 |
-|------|------|
-| 独立页面 | A/V Mix、Merge、Custom Command 各自有独立路由页面 |
-| 继承配置 | A/V Mix 和 Merge 页面继承全局 TranscodeConfig，不显示转码 UI |
-| 命令预览 | 每个独立页面均有自己的 CommandPreview 组件 |
-| Config 页面 | 仅保留 Transcode、Filters、Clip 三个选项卡 |
-| 预览位置 | CommandConfigPage 的命令预览移至页面顶部（预设选择器之上） |
-| 导航栏 | AppNavbar 新增 "A/V Mix"、"Merge"、"Custom" 导航项 |
+### 自定义命令规则
 
 <!-- v2.1.0-CHANGE: Phase 3.5 新增自定义命令规则 -->
-
-### 自定义命令规则
 
 | 规则 | 说明 |
 |------|------|
@@ -264,9 +349,9 @@
 | 预览 | 实时预览完整命令，但不调用 build_command（参数由用户直接控制） |
 | 优先级 | activeMode="custom" 时，toTaskConfig 优先生成 custom_command 配置 |
 
-<!-- v2.1.0-CHANGE: Phase 3.5.1 新增路径引用规则 -->
-
 ### 命令路径引用规则
+
+<!-- v2.1.0-CHANGE: Phase 3.5.1 新增路径引用规则 -->
 
 | 规则 | 说明 |
 |------|------|
@@ -276,15 +361,70 @@
 | filter_complex | filter_complex 参数值中的路径不做额外引用 |
 | 空格路径 | 子进程列表形式自动处理含空格路径 |
 
+### 分辨率输入规则
+
+<!-- v2.1.0-CHANGE: Phase 3.5.2 新增分辨率拆分规则 -->
+
+| 规则 | 说明 |
+|------|------|
+| UI 拆分 | Resolution 输入从单一文本框改为 W x H 双数字输入框（TranscodeForm 和 MergeSettingsForm 均适用） |
+| 默认值 | Merge 默认 1920x1080，Transcode 留空表示原始分辨率 |
+| 双向绑定 | 使用 computed get/set 实现拆分/合并，保持 config.resolution 为 "WxH" 字符串 |
+| 清空逻辑 | 切换到 copy/none 时清空 resolution |
+
+### 时间输入规则
+
+<!-- v2.1.0-CHANGE: Phase 3.5.2 新增时间输入拆分规则 -->
+
+| 规则 | 说明 |
+|------|------|
+| UI 拆分 | 时间输入从单一文本框改为 H:MM:SS.ms 四个独立数字输入框 |
+| 格式 | config 存储为 "H:MM:SS.mmm" 字符串，与 FFmpeg 兼容 |
+| 可选性 | StartTime 和 EndTime 均为可选（至少提供一个才生成剪辑命令） |
+| 对齐布局 | StartTime 和 EndTime 在 ClipForm 中并排显示（md:grid-cols-2） |
+| 占位符 | H(0-99), MM(0-59), SS(0-59), ms(0-999) |
+
+### 命令预览规则
+
+| 规则 | 说明 |
+|------|------|
+| 统一入口 | 所有模式（转码、剪辑、拼接、音频字幕混合）均通过 build_command 生成预览 |
+| 参数同步 | 预览使用的配置与实际执行时传入的配置完全一致 |
+| 实时更新 | 配置变更时命令预览自动更新（已有 300ms debounce） |
+
+### 命令预览 debounce 规则
+
+<!-- v2.1.1-CHANGE: 新增命令预览 debounce 规则 -->
+
+| 规则 | 说明 |
+|------|------|
+| debounce 时长 | 500ms（v2.1.0 为 300ms） |
+| in-flight 保护 | 请求进行中时新变更标记 `pendingUpdate = true`，请求完成后自动触发下一次更新 |
+| 竞态保护 | 单调递增 `requestId`，响应返回时校验是否为最新请求 |
+| watch 配置 | `watch(configRef, scheduleUpdate, { immediate: true })`，移除 `deep: true` |
+
+---
+
+## 页面布局规则
+
+<!-- v2.1.0-CHANGE: Phase 3.5 新增页面布局规则 -->
 <!-- v2.1.0-CHANGE: Phase 3.5.1 更新页面布局规则 -->
 
-### 页面布局规则
+### Phase 3.5 初始规则
 
 | 规则 | 说明 |
 |------|------|
 | 独立页面 | A/V Mix、Merge、Custom Command 各自有独立路由页面 |
 | 继承配置 | A/V Mix 和 Merge 页面继承全局 TranscodeConfig，不显示转码 UI |
 | 命令预览 | 每个独立页面均有自己的 CommandPreview 组件 |
+| Config 页面 | 仅保留 Transcode、Filters、Clip 三个选项卡 |
+| 预览位置 | CommandConfigPage 的命令预览移至页面顶部（预设选择器之上） |
+| 导航栏 | AppNavbar 新增 "A/V Mix"、"Merge"、"Custom" 导航项 |
+
+### Phase 3.5.1 更新规则
+
+| 规则 | 说明 |
+|------|------|
 | Config 页面 | Transcode、Filters、Clip、Merge 四个选项卡同时只显示一个（互斥显示） |
 | 三栏布局 | Config 页面每个表单内部使用 3 列网格布局，缩短纵向长度 |
 | 预览位置 | CommandConfigPage 的命令预览移至页面顶部（预设选择器之上） |
@@ -297,40 +437,13 @@
 | Intro/Outro 拖拽 | 使用 SplitDropZone 左半屏拖入 Intro，右半屏拖入 Outro |
 | Config 默认选项卡 | 进入 Config 页面时始终切换到 Transcode 选项卡 |
 
-<!-- v2.1.0-CHANGE: Phase 3.5.2 新增分辨率拆分规则 -->
+---
 
-### 分辨率输入规则
-
-| 规则 | 说明 |
-|------|------|
-| UI 拆分 | Resolution 输入从单一文本框改为 W x H 双数字输入框（TranscodeForm 和 MergeSettingsForm 均适用） |
-| 默认值 | Merge 默认 1920x1080，Transcode 留空表示原始分辨率 |
-| 双向绑定 | 使用 computed get/set 实现拆分/合并，保持 config.resolution 为 "WxH" 字符串 |
-| 清空逻辑 | 切换到 copy/none 时清空 resolution |
-
-<!-- v2.1.0-CHANGE: Phase 3.5.2 新增时间输入拆分规则 -->
-
-### 时间输入规则
-
-| 规则 | 说明 |
-|------|------|
-| UI 拆分 | 时间输入从单一文本框改为 H:MM:SS.ms 四个独立数字输入框 |
-| 格式 | config 存储为 "H:MM:SS.mmm" 字符串，与 FFmpeg 兼容 |
-| 可选性 | StartTime 和 EndTime 均为可选（至少提供一个才生成剪辑命令） |
-| 对齐布局 | StartTime 和 EndTime 在 ClipForm 中并排显示（md:grid-cols-2） |
-| 占位符 | H(0-99), MM(0-59), SS(0-59), ms(0-999) |
-
-| 规则 | 说明 |
-|------|------|
-| 统一入口 | 所有模式（转码、剪辑、拼接、音频字幕混合）均通过 build_command 生成预览 |
-| 参数同步 | 预览使用的配置与实际执行时传入的配置完全一致 |
-| 实时更新 | 配置变更时命令预览自动更新（已有 300ms debounce） |
-
-<!-- v2.1.0-CHANGE: Phase 4 新增规则 -->
-
-## Phase 4: 国际化与平台化业务规则
+## 国际化与平台化规则
 
 ### 语言切换规则
+
+<!-- v2.1.0-CHANGE: Phase 4 新增规则 -->
 
 | 规则 | 说明 |
 |------|------|
@@ -342,20 +455,9 @@
 | 框架 | vue-i18n v9+，Composition API 模式（legacy: false） |
 | 翻译键 | 扁平点分隔命名空间：nav., ffmpeg., settings., taskQueue., config., avMix., merge., custom., common. |
 
-### FFmpeg 下载按钮平台规则
-
-| 平台 | 行为 | 说明 |
-|------|------|------|
-| Windows (win32) | 显示 "Download FFmpeg" 按钮 | 使用 static_ffmpeg 包下载预编译二进制 |
-| macOS (darwin) | 显示 homebrew 安装提示 | "brew install ffmpeg"，附带 brew.sh 链接 |
-| Linux (ubuntu/debian) | 显示 apt 安装提示 | "sudo apt install ffmpeg" |
-| Linux (fedora) | 显示 dnf 安装提示 | "sudo dnf install ffmpeg" |
-| Linux (arch/manjaro) | 显示 pacman 安装提示 | "sudo pacman -S ffmpeg" |
-| Linux (其他) | 显示通用提示 | "Install ffmpeg via your package manager" |
-| 打包环境 | 所有平台禁用下载 | is_frozen() 时 static_ffmpeg 不可用 |
-| 后端守卫 | download_ffmpeg() 检查 sys.platform | 非 Windows 返回 download_not_supported 错误 + 安装指引 |
-
 ### 数据目录规则
+
+<!-- v2.1.0-CHANGE: Phase 4 新增规则 -->
 
 | 规则 | 说明 |
 |------|------|
@@ -370,50 +472,65 @@
 
 ---
 
-## Phase 5: 第二阶段用户体验优化
+## v2.1.1: UX 可靠性与错误处理规则
 
-<!-- v2.1.0-CHANGE: Phase 5 新增队列布局、打开文件夹、按钮尺寸等 UX 规则 -->
+### 错误处理规则
 
-### 队列表格布局规则
-
-| 规则 | 说明 |
-|------|------|
-| 无横向滚动 | 表格容器使用 `overflow-hidden`，禁止出现横向滚动条 |
-| 信息列移除 | 移除原有的"信息"列（duration/file_size 信息合并到文件名列中） |
-| 列宽约束 | Checkbox: `w-10 shrink-0`, State: `w-20 shrink-0`, Progress: `w-44 shrink-0`, Actions: `w-52 shrink-0` |
-| 文件列弹性 | 文件名列 `min-w-0`，自动填充剩余空间，内部使用 `truncate` 截断长文件名 |
-| 操作列固定 | Actions 列 `w-52 shrink-0 whitespace-nowrap`，确保按钮不换行跳位 |
-
-### 打开文件夹规则
+<!-- v2.1.1-CHANGE: 新增 Bridge API 调用错误处理规则 -->
 
 | 规则 | 说明 |
 |------|------|
-| 显示条件 | 仅 `completed` 状态且 `output_path` 非空的任务显示"打开文件夹"按钮 |
-| 跨平台 | Windows: `os.startfile(folder)`, macOS: `subprocess.Popen(["open", folder])`, Linux: `subprocess.Popen(["xdg-open", folder])` |
-| 路径解析 | 若 path 是文件则打开其所在目录（`os.path.dirname`），若 path 是目录则直接打开 |
-| 按钮样式 | `btn btn-sm btn-ghost`，文本按钮（显示 `t("taskQueue.actions.openFolder")`） |
-| Bridge API | `open_folder(path: str) -> {success, error?, data: null}` |
-| 静默失败 | 前端调用失败时 silently fail（不弹错误提示） |
+| 禁止静默吞没 | 所有 Bridge API 调用的 `catch` 块必须向用户展示错误反馈 |
+| 反馈组件 | 使用 DaisyUI alert 组件（`alert alert-error`）显示错误 |
+| 自动消失 | 错误提示 3 秒后自动消失（`setTimeout` 清空 alertMessage） |
+| 国际化 | 错误消息使用 `t()` 包装，支持中英文切换 |
+| 基本格式 | `t('common.operationFailed') + ': ' + (err as Error).message` |
 
-### 任务按钮尺寸规则
+**受影响组件**:
+
+| 组件 | 操作 | 原行为 |
+|------|------|--------|
+| `ClipForm.vue` | 获取文件时长 (`get_file_duration`) | `catch {}` 空块，静默失败 |
+| `TaskRow.vue` | 重置/重试任务 (`reset_task`/`retry_task`) | `catch {}` 空块，静默失败 |
+| `MergeFileList.vue` | 文件操作 | `catch {}` 空块，静默失败 |
+| `PresetSelector.vue` | 预设管理（加载/保存/删除） | `catch {}` 空块，静默失败 |
+
+### 破坏性操作确认规则
+
+<!-- v2.1.1-CHANGE: 新增破坏性操作确认对话框规则 -->
 
 | 规则 | 说明 |
 |------|------|
-| 统一尺寸 | 所有任务操作按钮（Start, Pause, Resume, Stop, Retry, Reset, Log, Open Folder, Move Up/Down）统一使用 `btn-sm` |
-| 批量按钮 | BatchControlBar 中所有按钮（Start All, Pause All, Resume All, Stop All）统一使用 `btn-sm` |
-| 禁用按钮 | Move Up/Down 的 `btn-xs btn-ghost btn-square` 也升级为 `btn-sm` |
-| 设计理念 | 重要操作按钮不应过小，`btn-sm` 是 DaisyUI 中适合操作按钮的最小尺寸 |
+| 适用操作 | 移除选中任务、清空队列、全部停止 |
+| 对话框类型 | DaisyUI modal（`<dialog class="modal">`） |
+| 对话框内容 | 操作标题 + 影响描述（如 "确认移除选中的 N 个任务？此操作不可撤销。"） |
+| 按钮布局 | 取消按钮 `btn btn-ghost`，确认按钮 `btn btn-error` |
+| 风格一致 | 与 `FFmpegSetup.vue` 中已有的确认 modal 保持一致的 HTML 结构和样式 |
+| 背景关闭 | 点击背景遮罩可关闭对话框（`<form method="dialog" class="modal-backdrop"><button>close</button></form>`） |
 
-### 任务状态变更重新获取规则
+**需确认的操作清单**:
+
+| 操作 | 组件 | 确认标题 | 确认消息模板 |
+|------|------|---------|-------------|
+| 移除选中任务 | `TaskToolbar.vue` | 移除任务 | 确认移除选中的 N 个任务？此操作不可撤销。 |
+| 清空队列 | `BatchControlBar.vue` | 清空队列 | 确认清空所有任务？此操作不可撤销。 |
+| 全部停止 | `BatchControlBar.vue` | 停止所有 | 确认停止所有运行中的任务？ |
+
+### 命令复制反馈规则
+
+<!-- v2.1.1-CHANGE: 新增命令复制反馈规则 -->
 
 | 规则 | 说明 |
 |------|------|
-| 触发条件 | `task_state_changed` 事件中 `new_state === "completed"` 或 `new_state === "failed"` |
-| 行为 | 调用 `fetchTasks()` 完整重新获取任务列表 |
-| 原因 | `task_state_changed` 事件仅携带 `{task_id, old_state, new_state}`，不包含 `output_path` 等后端更新的字段 |
-| 影响范围 | 确保 completed 任务立即显示 output_path（用于打开文件夹按钮），failed 任务立即显示 error 信息 |
+| 复制反馈 | 点击复制后显示 "Copied!" 文本反馈，1.5 秒后自动消失 |
+| 命令传递 | 使用 prop 传递命令文本，禁止使用 `document.getElementById` 获取数据 |
+| Clipboard API | 优先使用 `navigator.clipboard.writeText()` |
+| Fallback | PyWebView 中 `navigator.clipboard` 不可用时，fallback 到 `textarea + document.execCommand('copy')` |
+| 国际化 | "Copied!" 文本使用 `t('common.copied')` |
 
 ### 前端设计一致性规则
+
+<!-- v2.1.0-CHANGE: Phase 5 新增 -->
 
 | 规则 | 说明 |
 |------|------|

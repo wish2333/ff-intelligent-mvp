@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import type { AppInfoDTO } from "../../composables/useSettings"
 import { useI18n } from "vue-i18n"
 
@@ -8,13 +9,13 @@ defineProps<{
 
 const { t } = useI18n()
 
-const items: { label: string; key: keyof AppInfoDTO }[] = [
-  { label: t("settings.about.appVersion"), key: "app_version" },
-  { label: t("settings.about.pythonVersion"), key: "python_version" },
-  { label: t("settings.about.ffmpegVersion"), key: "ffmpeg_version" },
-  { label: t("settings.about.ffprobeVersion"), key: "ffprobe_version" },
-  { label: t("settings.about.platform"), key: "is_packaged" },
-]
+const items = computed(() => [
+  { label: t("settings.about.appVersion"), key: "app_version" as const },
+  { label: t("settings.about.pythonVersion"), key: "python_version" as const },
+  { label: t("settings.about.ffmpegVersion"), key: "ffmpeg_version" as const },
+  { label: t("settings.about.ffprobeVersion"), key: "ffprobe_version" as const },
+  { label: t("settings.about.platform"), key: "is_packaged" as const },
+])
 </script>
 
 <template>

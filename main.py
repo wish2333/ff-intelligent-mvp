@@ -6,6 +6,7 @@ from pathlib import Path
 
 import warnings
 import sys
+import threading
 
 import webview
 
@@ -208,46 +209,30 @@ class FFmpegApi(Bridge):
                     output_dir=output_dir,
                 )
 
-            # Determine tasks to add
+            # Determine tasks to add (without probing - use placeholder data)
             tasks: list[Task] = []
             if task_config.merge and len(task_config.merge.file_list) >= 2:
                 # Merge mode: create ONE task for the entire merge operation
                 merge_cfg = task_config.merge
                 first_path = merge_cfg.file_list[0]
-                try:
-                    info = probe_file(first_path) or {}
-                    task = Task(
-                        file_path=info.get("file_path", first_path),
-                        file_name=info.get("file_name", ""),
-                        file_size_bytes=info.get("file_size_bytes", 0),
-                        duration_seconds=info.get("duration_seconds", 0.0),
-                        config=task_config,
-                    )
-                except Exception:
-                    task = Task(file_path=first_path, file_name=Path(first_path).name, config=task_config)
+                task = Task(
+                    file_path=first_path,
+                    file_name=Path(first_path).name,
+                    file_size_bytes=0,
+                    duration_seconds=0.0,
+                    config=task_config,
+                )
                 tasks = [task]
             else:
                 # Normal mode: create one task per file
                 for path in paths:
-                    try:
-                        info = probe_file(path) or {}
-                        task = Task(
-                            file_path=info.get("file_path", path),
-                            file_name=info.get("file_name", ""),
-                            file_size_bytes=info.get("file_size_bytes", 0),
-                            duration_seconds=info.get("duration_seconds", 0.0),
-                            config=task_config,
-                        )
-                        tasks.append(task)
-                    except Exception as probe_err:
-                        logger.warning("probe_file failed for {}: {}", path, probe_err)
-                        tasks.append(Task(
-                            file_path=path,
-                            file_name=Path(path).name,
-                            file_size_bytes=0,
-                            duration_seconds=0.0,
-                            config=task_config,
-                        ))
+                    tasks.append(Task(
+                        file_path=path,
+                        file_name=Path(path).name,
+                        file_size_bytes=0,
+                        duration_seconds=0.0,
+                        config=task_config,
+                    ))
 
             # Batch add to queue (single notification)
             self._queue.add_tasks(tasks)
@@ -255,6 +240,26 @@ class FFmpegApi(Bridge):
             # Emit individual events after atomic add
             for task in tasks:
                 self._emit("task_added", {"task": task.to_dict()})
+
+            # Background thread: probe files and emit updates
+            def _probe_bg() -> None:
+                for task in tasks:
+                    try:
+                        info = probe_file(task.file_path) or {}
+                        task.file_name = info.get("file_name", task.file_name)
+                        task.file_path = info.get("file_path", task.file_path)
+                        task.file_size_bytes = info.get("file_size_bytes", 0)
+                        task.duration_seconds = info.get("duration_seconds", 0.0)
+                        self._emit("task_info_updated", {
+                            "task_id": task.id,
+                            "file_name": task.file_name,
+                            "duration_seconds": task.duration_seconds,
+                            "file_size_bytes": task.file_size_bytes,
+                        })
+                    except Exception as probe_err:
+                        logger.warning("probe_file failed for {}: {}", task.file_path, probe_err)
+
+            threading.Thread(target=_probe_bg, daemon=True).start()
 
             return {"success": True, "data": [t.to_dict() for t in tasks]}
         except Exception as exc:
@@ -485,16 +490,37 @@ class FFmpegApi(Bridge):
 
     @expose
     def validate_config(self, config: dict) -> dict:
-        """Validate a config dict. Returns {errors, warnings} lists."""
+        """Validate a config dict. Returns structured {errors, warnings} with param info."""
         try:
             from core.models import TaskConfig
             from core.command_builder import validate_config, ValidationContext
             tc = TaskConfig.from_dict(config)
             ctx = ValidationContext()
             result = validate_config(tc, ctx)
-            return {"success": True, "data": result}
+            structured = {
+                "errors": [{"param": i["param"], "message": i["message"]} for i in result.get("errors", []) if "param" in i],
+                "warnings": [{"param": i["param"], "message": i["message"]} for i in result.get("warnings", []) if "param" in i],
+            }
+            return {"success": True, "data": structured}
         except Exception as exc:
             logger.exception("validate_config failed: {}", exc)
+            return {"success": False, "error": str(exc)}
+
+    @expose
+    def preview_command(self, config: dict) -> dict:
+        """Merged command preview and validation in a single IPC call."""
+        try:
+            from core.models import TaskConfig
+            from core.command_builder import validate_config, ValidationContext, build_command_preview
+            tc = TaskConfig.from_dict(config)
+            ctx = ValidationContext(preview_mode=True)
+            result = validate_config(tc, ctx)
+            command = build_command_preview(tc)
+            errors = [{"param": i["param"], "message": i["message"]} for i in result.get("errors", []) if "param" in i]
+            warnings = [{"param": i["param"], "message": i["message"]} for i in result.get("warnings", []) if "param" in i]
+            return {"success": True, "data": {"command": command, "errors": errors, "warnings": warnings}}
+        except Exception as exc:
+            logger.exception("preview_command failed: {}", exc)
             return {"success": False, "error": str(exc)}
 
     @expose

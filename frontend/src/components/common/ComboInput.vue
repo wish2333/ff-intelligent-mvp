@@ -80,6 +80,7 @@ onBeforeUnmount(() => {
       class="input input-bordered input-sm w-full pr-7"
       @focus="onInputFocus"
       @input="onInput"
+      @keydown.escape="isOpen = false"
     />
     <!-- Dropdown toggle button -->
     <button

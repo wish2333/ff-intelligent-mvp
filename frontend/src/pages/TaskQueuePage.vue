@@ -57,9 +57,7 @@ async function handleAddFiles(): Promise<void> {
       return
     }
     if (!res.data || res.data.length === 0) return
-    console.log("[TaskQueuePage] selected files:", res.data)
-    const added = await queue.addTasks(res.data, globalConfig.toTaskConfig())
-    console.log("[TaskQueuePage] added tasks:", added.length)
+    await queue.addTasks(res.data, globalConfig.toTaskConfig())
   } catch (err) {
     console.error("[TaskQueuePage] handleAddFiles error:", err)
   }
@@ -68,10 +66,8 @@ async function handleAddFiles(): Promise<void> {
 async function handleDrop(): Promise<void> {
   try {
     const paths = await fileDrop.onDrop()
-    console.log("[TaskQueuePage] dropped files:", paths)
     if (paths.length > 0) {
-      const added = await queue.addTasks(paths, globalConfig.toTaskConfig())
-      console.log("[TaskQueuePage] added tasks:", added.length)
+      await queue.addTasks(paths, globalConfig.toTaskConfig())
     }
   } catch (err) {
     console.error("[TaskQueuePage] handleDrop error:", err)

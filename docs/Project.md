@@ -141,6 +141,20 @@ uv run build.py
 | `ff-intelligent-neo/queue_state.json` | 任务队列持久化状态 |
 | `ff-intelligent-neo/presets/*.json` | 用户自定义预设 |
 
+## 版本变更索引
+
+| 版本 | 新增/修改内容 |
+|------|---------|
+| v2.0.0 | 架构全面重构：多页面 Vue Router、任务队列可控、结构化 FFmpeg 配置、预设管理、应用设置持久化 |
+| v2.1.0 | 命令构建器完善（Phase 3）、页面拆分（A/V Mix、Merge、Custom）、Clip 剪辑、状态机 Reset |
+| v2.1.1 | 国际化（i18n）、多平台支持、数据目录统一、性能优化（命令预览、异步探测） |
+| Phase 3.5 | 编码器质量自动填充、片头片尾、自定义命令、分辨率/时间输入拆分 |
+| Phase 3.5.1 | 滤镜互斥修复、路径引用修复、音频码率默认调整 |
+| Phase 3.5.2 | SplitDropZone 全屏拖拽、Merge 独立提交、Intro/Outro 移至 Config 页 |
+| Phase 4 | 国际化架构、core/paths.py 数据目录、平台检测增强 |
+| Phase 5 | 队列表格布局重构、打开文件夹功能、任务状态变更重新获取、按钮尺寸统一 |
+| v2.1.1 | useCommandPreview 优化、preview_command API、Bridge 事件类型安全、前端错误反馈 |
+
 ## 已知问题与未来规划
 
 ### 已知问题 (v2.0.0)
@@ -150,12 +164,20 @@ uv run build.py
 - 大队列（100+ 任务）JSON 序列化可能有性能影响
 - 多实例同时运行可能导致队列状态文件损坏
 
-### 规划中 (v2.1.0)
+### 已实现 (v2.1.0 / v2.1.1)
 
-- 多平台兼容性改进
-- 命令构建器功能完善
-- 任务完成日志显示优化
-- 水印路径拖拽文件输入
-- FFmpeg 版本指示器实时更新
-- 浅色/深色主题支持
-- i18n 多语言支持
+以下功能已在 v2.1.0 / v2.1.1 中实现：
+
+- [x] 多平台兼容性改进（Phase 4 平台检测）
+- [x] 命令构建器功能完善（Phase 3 全系列）
+- [x] 任务完成日志显示优化（日志可见性规则）
+- [x] 水印路径拖拽文件输入（FileDropInput / SplitDropZone）
+- [x] FFmpeg 版本指示器实时更新（ffmpeg_version_changed 事件）
+- [x] 浅色/深色主题支持（useTheme.ts）
+- [x] i18n 多语言支持（Phase 4）
+
+### 待规划
+
+- 大队列（100+ 任务）性能优化
+- 多实例运行队列状态保护
+- 暂停时缓冲区溢出处理

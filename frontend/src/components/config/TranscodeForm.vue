@@ -74,18 +74,20 @@ const resHeight = computed({
   },
 })
 
-// Clear video-related fields when codec switches to copy/none
+// Clear video-related fields when codec switches to copy/none (atomic batch)
 watch(() => props.config.video_codec, (newVal) => {
   if (newVal === "copy" || newVal === "none") {
-    props.config.video_bitrate = ""
-    props.config.resolution = ""
-    props.config.framerate = ""
-    props.config.quality_mode = ""
-    props.config.quality_value = 0
-    props.config.preset = ""
-    props.config.pixel_format = ""
-    props.config.max_bitrate = ""
-    props.config.bufsize = ""
+    Object.assign(props.config, {
+      video_bitrate: "",
+      resolution: "",
+      framerate: "",
+      quality_mode: "",
+      quality_value: 0,
+      preset: "",
+      pixel_format: "",
+      max_bitrate: "",
+      bufsize: "",
+    })
   }
 })
 
@@ -263,7 +265,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             class="input input-bordered input-sm w-full"
           />
         </div>
-        <div></div>
+        <div class="invisible" aria-hidden="true"></div>
 
         <!-- Row 5: PF -->
         <div v-if="isVideoReencode()" class="form-control">
@@ -277,8 +279,8 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             @update:model-value="config.pixel_format = $event"
           />
         </div>
-        <div></div>
-        <div></div>
+        <div class="invisible" aria-hidden="true"></div>
+        <div class="invisible" aria-hidden="true"></div>
 
         <!-- Buffer Size (full width, conditional) -->
         <div v-if="isVideoReencode() && config.max_bitrate" class="form-control col-span-3">

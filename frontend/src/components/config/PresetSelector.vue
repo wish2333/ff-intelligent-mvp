@@ -21,6 +21,9 @@ const emit = defineEmits<{
 const presets = ref<PresetDTO[]>([])
 const loading = ref(false)
 const selectedId = ref("")
+const alertMessage = ref("")
+const confirmDialog = ref<HTMLDialogElement | null>(null)
+const pendingDeleteId = ref("")
 
 const selectedPreset = computed(() => {
   return presets.value.find((p) => p.id === selectedId.value) || null
@@ -38,8 +41,9 @@ async function fetchPresets() {
     if (res.success && res.data) {
       presets.value = res.data
     }
-  } catch {
-    // silently fail
+  } catch (err) {
+    alertMessage.value = t("common.operationFailed") + ": " + (err as Error).message
+    setTimeout(() => { alertMessage.value = "" }, 3000)
   } finally {
     loading.value = false
   }
@@ -51,14 +55,20 @@ function handleSelect() {
   }
 }
 
-async function handleDelete() {
+function requestDelete() {
   if (!selectedPreset.value || !canDelete.value) return
-  if (confirm(t("config.preset.deleteConfirm", { name: selectedPreset.value.name }))) {
-    const res = await call<null>("delete_preset", selectedPreset.value.id)
-    if (res.success) {
-      selectedId.value = ""
-      await fetchPresets()
-    }
+  pendingDeleteId.value = selectedPreset.value.id
+  confirmDialog.value?.showModal()
+}
+
+async function confirmDelete() {
+  confirmDialog.value?.close()
+  if (!pendingDeleteId.value) return
+  const res = await call<null>("delete_preset", pendingDeleteId.value)
+  if (res.success) {
+    selectedId.value = ""
+    pendingDeleteId.value = ""
+    await fetchPresets()
   }
 }
 
@@ -76,7 +86,11 @@ defineExpose({ fetchPresets, setSelectedId: (id: string) => { selectedId.value =
 <template>
   <div class="card bg-base-200 shadow-sm border border-base-300">
     <div class="card-body p-4">
-      <h2 class="card-title text-sm font-semibold mb-2">{{ t("config.preset.title") }}</h2>
+      <div v-if="alertMessage" class="alert alert-error py-1 px-3 text-xs mb-2">{{ alertMessage }}</div>
+      <h2 class="card-title text-sm font-semibold mb-2">
+        {{ t("config.preset.title") }}
+        <span v-if="loading" class="loading loading-spinner loading-xs"></span>
+      </h2>
 
       <!-- Preset dropdown -->
       <div class="flex gap-2 mb-2">
@@ -84,6 +98,7 @@ defineExpose({ fetchPresets, setSelectedId: (id: string) => { selectedId.value =
           v-model="selectedId"
           @change="handleSelect"
           class="select select-bordered select-sm flex-1"
+          :disabled="loading"
         >
           <option value="" disabled>{{ t("config.preset.selectPreset") }}</option>
           <optgroup
@@ -132,11 +147,24 @@ defineExpose({ fetchPresets, setSelectedId: (id: string) => { selectedId.value =
         <button
           class="btn btn-ghost btn-sm btn-error"
           :disabled="!canDelete"
-          @click="handleDelete"
+          @click="requestDelete"
         >
           {{ t("config.preset.delete") }}
         </button>
       </div>
     </div>
+
+    <!-- Delete confirmation modal -->
+    <dialog ref="confirmDialog" class="modal">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">{{ t("common.delete") }}</h3>
+        <p class="py-4">{{ t("common.deletePresetConfirm", { name: selectedPreset?.name || "" }) }}</p>
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="confirmDialog?.close()">{{ t("common.cancel") }}</button>
+          <button class="btn btn-error" @click="confirmDelete()">{{ t("common.confirm") }}</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
   </div>
 </template>

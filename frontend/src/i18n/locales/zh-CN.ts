@@ -11,6 +11,7 @@ export default {
     ffmpegReady: "FFmpeg 已就绪",
     ffmpegVersion: "FFmpeg {version}",
     ffmpegNotFound: "未找到 FFmpeg",
+    ffmpegChecking: "检测中...",
     ffmpegUnknownError: "未知错误",
   },
 
@@ -362,6 +363,9 @@ export default {
       addFiles: "添加文件",
       minFilesWarning: "合并至少需要 2 个文件。",
       dragDropHint: "将文件拖放到此页面即可添加。",
+      moveUp: "上移",
+      moveDown: "下移",
+      remove: "移除",
     },
   },
 
@@ -382,11 +386,20 @@ export default {
     save: "保存",
     delete: "删除",
     copy: "复制",
+    copied: "已复制",
+    operationFailed: "操作失败",
     loading: "加载中...",
     dropFileHere: "拖放文件到此处",
     dropDefault: "拖放文件到此处或点击选择",
     unsupportedFileType: "不支持的文件类型。可接受：{accept}",
     fileDialogFailed: "打开文件对话框失败",
+    removeTasks: "移除任务",
+    removeTasksConfirm: "确认移除选中的 {count} 个任务？此操作不可撤销。",
+    clearQueue: "清空队列",
+    clearQueueConfirm: "确认清空所有任务？此操作不可撤销。",
+    stopAll: "停止所有",
+    stopAllConfirm: "确认停止所有运行中的任务？",
+    deletePresetConfirm: "确认删除预设 \"{name}\"？此操作不可撤销。",
   },
 
   encoderDescriptions: {

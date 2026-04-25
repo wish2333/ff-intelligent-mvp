@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from "vue"
+import { ref, computed, onMounted, onUnmounted } from "vue"
 import type { FfmpegVersionDTO } from "../../composables/useSettings"
 import type { FfmpegInstallInfo } from "../../types/settings"
 import { useI18n } from "vue-i18n"
+import { useBridge } from "../../composables/useBridge"
 
 const props = defineProps<{
   versions: FfmpegVersionDTO[]
@@ -19,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { on } = useBridge()
 const showConfirm = ref(false)
 const isDownloading = ref(false)
 
@@ -36,6 +38,21 @@ const statusBadge = computed(() => {
 const isWindows = computed(() => props.platform === "win32")
 const installInfo = ref<FfmpegInstallInfo | null>(null)
 
+function onFfmpegVersionChanged(detail: unknown) {
+  const payload = detail as Record<string, unknown>
+  if (typeof payload.status === "string") {
+    isDownloading.value = false
+  }
+}
+
+onMounted(() => {
+  on("ffmpeg_version_changed", onFfmpegVersionChanged)
+})
+
+onUnmounted(() => {
+  // Event cleanup handled by useBridge
+})
+
 async function handleDownload(): Promise<void> {
   if (!isWindows.value) {
     const res = await (await import("../../bridge")).call<{ platform: string; instructions: FfmpegInstallInfo }>("download_ffmpeg")
@@ -46,13 +63,7 @@ async function handleDownload(): Promise<void> {
   }
   showConfirm.value = false
   isDownloading.value = true
-  try {
-    emit("download")
-  } finally {
-    setTimeout(() => {
-      isDownloading.value = false
-    }, 5000)
-  }
+  emit("download")
 }
 </script>
 
@@ -168,7 +179,7 @@ async function handleDownload(): Promise<void> {
         </div>
       </div>
       <form method="dialog" class="modal-backdrop">
-        <button @click="showConfirm = false">close</button>
+        <button @click="showConfirm = false">{{ t("common.close") }}</button>
       </form>
     </dialog>
   </div>
