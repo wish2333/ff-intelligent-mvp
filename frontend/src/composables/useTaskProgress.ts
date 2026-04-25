@@ -24,15 +24,19 @@ export function useTaskProgress() {
   }
 
   on("task_progress", (detail: unknown) => {
-    const { task_id, progress } = detail as {
-      task_id: string
-      progress: TaskProgressDTO
-    }
-    progressMap.value = { ...progressMap.value, [task_id]: progress }
+    const payload = detail as Record<string, unknown>
+    if (typeof payload.task_id !== "string") return
+    if (typeof payload.progress !== "object" || payload.progress === null) return
+    const task_id = payload.task_id
+    progressMap.value = { ...progressMap.value, [task_id]: payload.progress as TaskProgressDTO }
   })
 
   on("task_log", (detail: unknown) => {
-    const { task_id, line } = detail as { task_id: string; line: string }
+    const payload = detail as Record<string, unknown>
+    if (typeof payload.task_id !== "string") return
+    if (typeof payload.line !== "string") return
+    const task_id = payload.task_id
+    const line = payload.line
     const existing = logsMap.value[task_id] ?? []
     const next = existing.length >= 500 ? existing.slice(-499) : existing
     logsMap.value = { ...logsMap.value, [task_id]: [...next, line] }

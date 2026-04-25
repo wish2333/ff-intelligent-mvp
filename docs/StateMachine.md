@@ -15,6 +15,8 @@
 
 ## 合法状态转移
 
+<!-- v2.1.0-CHANGE: 行16-行44 新增完整状态转移图 -->
+
 ```mermaid
 stateDiagram-v2
     [*] --> Pending
@@ -67,6 +69,8 @@ VALID_TRANSITIONS: dict[TaskState, set[TaskState]] = {
 ## 按钮映射
 
 <!-- v2.1.0-CHANGE: 行56-行82 新增按钮映射，涵盖 Reset 变更 -->
+
+### 按状态显示按钮
 
 | 状态 | 显示按钮 | 说明 |
 |------|---------|------|

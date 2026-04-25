@@ -66,10 +66,8 @@ export function useTaskQueue() {
     paths: string[],
     config?: TaskConfigDTO,
   ): Promise<TaskDTO[]> {
-    console.log("[useTaskQueue] addTasks calling backend with", paths.length, "paths")
     try {
       const res = await call<TaskDTO[]>("add_tasks", paths, config ?? {})
-      console.log("[useTaskQueue] add_tasks response:", JSON.stringify(res)?.slice(0, 200))
       if (res.success && res.data) {
         const newIds = new Set(res.data.map((t) => t.id))
         const existing = tasks.value.filter((t) => !newIds.has(t.id))
@@ -155,19 +153,20 @@ export function useTaskQueue() {
   // to avoid duplicates when event system is active
 
   on("task_removed", (detail: unknown) => {
-    const { task_id } = detail as { task_id: string }
-    tasks.value = tasks.value.filter((t) => t.id !== task_id)
+    const payload = detail as Record<string, unknown>
+    if (typeof payload.task_id !== "string") return
+    tasks.value = tasks.value.filter((t) => t.id !== payload.task_id)
     const next = new Set(selectedIds.value)
-    next.delete(task_id)
+    next.delete(payload.task_id)
     selectedIds.value = next
   })
 
   on("task_state_changed", (detail: unknown) => {
-    const { task_id, new_state } = detail as {
-      task_id: string
-      old_state: TaskState
-      new_state: TaskState
-    }
+    const payload = detail as Record<string, unknown>
+    if (typeof payload.task_id !== "string") return
+    if (typeof payload.new_state !== "string") return
+    const task_id = payload.task_id as string
+    const new_state = payload.new_state as TaskState
     const idx = tasks.value.findIndex((t) => t.id === task_id)
     if (idx !== -1) {
       const updated = [...tasks.value]
@@ -182,6 +181,23 @@ export function useTaskQueue() {
 
   on("queue_changed", (detail: unknown) => {
     summary.value = detail as QueueSummary
+  })
+
+  on("task_info_updated", (detail: unknown) => {
+    const payload = detail as Record<string, unknown>
+    if (typeof payload.task_id !== "string") return
+    const task_id = payload.task_id as string
+    const idx = tasks.value.findIndex((t) => t.id === task_id)
+    if (idx !== -1) {
+      const updated = [...tasks.value]
+      updated[idx] = {
+        ...updated[idx],
+        file_name: typeof payload.file_name === "string" ? payload.file_name : updated[idx].file_name,
+        duration_seconds: typeof payload.duration_seconds === "number" ? payload.duration_seconds : updated[idx].duration_seconds,
+        file_size_bytes: typeof payload.file_size_bytes === "number" ? payload.file_size_bytes : updated[idx].file_size_bytes,
+      }
+      tasks.value = updated
+    }
   })
 
   return {

@@ -1,6 +1,42 @@
 # 业务流程
 
-## FFmpeg 版本切换流程
+## 版本变更索引
+
+<!-- 本文件按功能流程组织，每条流程标注了新增/修改的版本 -->
+
+| 版本 | 新增/修改流程 | 说明 |
+|------|---------|------|
+| v2.1.0 | FFmpeg 版本切换流程 | 新增版本切换与实时更新流程 |
+| v2.1.0 | 任务 Reset 流程 | 新增 Reset 流程 |
+| v2.1.0 | Download FFmpeg 流程 | 新增下载确认流程 |
+| v2.1.0 | 主题切换流程 | 新增主题切换流程 |
+| v2.1.0 / Phase 3 | 硬件编码器检测流程 | Phase 3 新增 |
+| v2.1.0 / Phase 3 | 视频剪辑流程 | Phase 3 新增 |
+| v2.1.0 / Phase 3 | 多视频拼接流程 | Phase 3 新增 |
+| v2.1.0 / Phase 3 | 音频字幕混合流程 | Phase 3 新增 |
+| v2.1.0 / Phase 3 | 横竖屏转换流程 | Phase 3 新增 |
+| v2.1.0 / Phase 3.5 | 编码器质量自动填充流程 | Phase 3.5 新增 |
+| v2.1.0 / Phase 3.5 | 自定义命令流程 | Phase 3.5 新增 |
+| v2.1.0 / Phase 3.5 | 片头片尾拼接流程 | Phase 3.5 新增 |
+| v2.1.0 / Phase 3.5 | 剪辑条件包含流程 | Phase 3.5 新增 |
+| v2.1.0 / Phase 3.5.1 | 滤镜互斥清理流程 | Phase 3.5.1 新增 |
+| v2.1.0 / Phase 3.5.2 | Merge 独立提交流程 | Phase 3.5.2 新增 |
+| v2.1.0 / Phase 3.5.2 | Concat 列表文件创建流程 | Phase 3.5.2 新增 |
+| v2.1.0 / Phase 3.5.2 | Intro/Outro 全局应用流程 | Phase 3.5.2 新增 |
+| v2.1.0 / Phase 4 | 语言切换流程 | Phase 4 新增国际化 |
+| v2.1.0 / Phase 4 | 数据目录迁移流程 | Phase 4 新增 |
+| v2.1.0 / Phase 4 | FFmpeg 平台下载流程 | Phase 4 新增 |
+| v2.1.0 / Phase 5 | 打开文件夹流程 | Phase 5 新增 UX 优化 |
+| v2.1.0 / Phase 5 | 任务状态变更重新获取流程 | Phase 5 新增 |
+| v2.1.1 | 命令预览流程（重写） | v2.1.1 重写，合并 IPC |
+| v2.1.1 | 文件探测异步流程 | v2.1.1 新增 |
+| v2.1.1 | FFmpeg 下载完成流程（修改） | v2.1.1 改为事件驱动 |
+
+---
+
+## FFmpeg 管理流程
+
+### FFmpeg 版本切换流程
 
 <!-- v2.1.0-CHANGE: 行3-行25 新增版本切换与实时更新流程 -->
 
@@ -23,7 +59,7 @@ sequenceDiagram
     Navbar->>Navbar: 重新渲染状态徽标
 ```
 
-### 流程说明
+#### 流程说明
 
 1. 用户在 Settings 页面的 FFmpeg 面板中选择一个版本
 2. 前端调用 `switch_ffmpeg(path)` Bridge API
@@ -31,7 +67,107 @@ sequenceDiagram
 4. 后端通过 `_emit("ffmpeg_version_changed")` 广播事件
 5. AppNavbar 监听事件并实时更新 FFmpeg 状态徽标
 
-## 任务 Reset 流程
+---
+
+### Download FFmpeg 流程
+
+<!-- v2.1.0-CHANGE: 行60-行82 新增下载确认流程 -->
+<!-- v2.1.1-CHANGE: 下载完成机制从固定超时改为事件驱动，详见 v2.1.1 节 -->
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant FFmpegSetup as FFmpegSetup.vue
+    participant Parent as SettingsPage
+    participant Main as main.py
+
+    User->>FFmpegSetup: 点击 "Download FFmpeg"
+    FFmpegSetup->>FFmpegSetup: showConfirm = true（弹出 modal）
+    alt 用户取消
+        User->>FFmpegSetup: 点击 Cancel 或背景
+        FFmpegSetup->>FFmpegSetup: showConfirm = false
+    else 用户确认
+        User->>FFmpegSetup: 点击 Confirm
+        FFmpegSetup->>FFmpegSetup: isDownloading = true, showConfirm = false
+        FFmpegSetup->>Parent: emit("download")
+        Parent->>Main: download_ffmpeg()
+        Main-->>Parent: 下载结果
+        Note over FFmpegSetup: v2.1.1: 事件驱动恢复（监听 ffmpeg_version_changed）
+    end
+```
+
+#### 流程说明
+
+1. Download FFmpeg 按钮始终可见（不受 FFmpeg 当前状态影响）
+2. 点击后弹出 DaisyUI modal 确认对话框
+3. 用户确认后：设置 loading 状态 -> 触发 download 事件 -> 父组件处理后端调用
+4. 下载过程中按钮禁用并显示 spinner
+5. detecting 状态时按钮也禁用
+6. **v2.1.1**: 下载完成通过监听 `ffmpeg_version_changed` 事件恢复，不再使用固定 5 秒超时
+
+---
+
+### FFmpeg 平台下载流程
+
+<!-- v2.1.0-CHANGE: Phase 4 新增流程 -->
+
+```
+用户 -> SettingsPage -> FFmpegSetup.vue: 点击按钮
+-> if platform === "win32":
+  -> 弹出 DaisyUI modal 确认对话框
+  -> 确认 -> call("download_ffmpeg")
+  -> main.py: static_ffmpeg.add_paths() 下载
+  -> 成功 -> ffmpeg_version_changed 事件
+-> else:
+  -> 显示平台安装提示 (非按钮，静态文本)
+  -> macOS: "brew install ffmpeg" + brew.sh 链接
+  -> Linux: 对应包管理器命令
+```
+
+#### 非 Windows 调用 download_ffmpeg:
+
+```
+main.py: download_ffmpeg()
+-> sys.platform != "win32"
+-> 返回 {"success": False, "error": "download_not_supported", "data": {"platform": "darwin", "instructions": {"method": "homebrew", "command": "brew install ffmpeg", "url": "https://brew.sh"}}}
+```
+
+---
+
+### FFmpeg 下载完成流程（v2.1.1 重写）
+
+<!-- v2.1.1-CHANGE: 修改下载完成流程，从固定超时改为事件驱动 -->
+
+```
+用户 -> SettingsPage -> FFmpegSetup.vue: 点击 "Download FFmpeg"
+-> 弹出 DaisyUI modal 确认对话框
+-> 用户确认:
+  -> isDownloading = true, showConfirm = false
+  -> emit("download")
+  -> Parent -> call("download_ffmpeg")
+  -> main.py -> static_ffmpeg.add_paths() 下载
+  -> 下载完成:
+    -> _emit("ffmpeg_version_changed", {version, path, status: "ready"})
+    -> _emit("ffmpeg_version_changed", {version, path, status: "not_found"})  // 失败时
+  -> FFmpegSetup.vue 监听 ffmpeg_version_changed:
+    -> status === "ready":
+      -> isDownloading = false
+        -> 更新版本号显示
+    -> status === "not_found":
+      -> isDownloading = false
+        -> 显示下载失败错误提示
+```
+
+#### v2.1.0 对比:
+
+- v2.1.0: `setTimeout(() => isDownloading = false, 5000)` 固定 5 秒超时，慢速网络 spinner 提前消失
+- v2.1.1: 事件驱动，下载真正完成/失败后才恢复 UI 状态
+
+---
+
+## 任务状态流程
+
+### 任务 Reset 流程
 
 <!-- v2.1.0-CHANGE: 行30-行55 新增 Reset 流程 -->
 
@@ -59,7 +195,7 @@ sequenceDiagram
     Control-->>TaskRow: true
 ```
 
-### 流程说明
+#### 流程说明
 
 1. 用户在 completed/cancelled 任务的 Action 列点击 Reset 按钮
 2. TaskRow 发射 `reset` 事件，TaskQueuePage 调用 `useTaskControl.resetTask(id)`
@@ -71,39 +207,57 @@ sequenceDiagram
    - 广播 `task_state_changed` 和 `queue_changed` 事件
 5. 前端通过事件更新 UI，任务回到 pending 状态
 
-## Download FFmpeg 流程
+---
 
-<!-- v2.1.0-CHANGE: 行60-行82 新增下载确认流程 -->
+### 任务状态变更重新获取流程
 
-```mermaid
-sequenceDiagram
-    participant User as 用户
-    participant FFmpegSetup as FFmpegSetup.vue
-    participant Parent as SettingsPage
-    participant Main as main.py
+<!-- v2.1.0-CHANGE: Phase 5 新增 -->
 
-    User->>FFmpegSetup: 点击 "Download FFmpeg"
-    FFmpegSetup->>FFmpegSetup: showConfirm = true（弹出 modal）
-    alt 用户取消
-        User->>FFmpegSetup: 点击 Cancel 或背景
-        FFmpegSetup->>FFmpegSetup: showConfirm = false
-    else 用户确认
-        User->>FFmpegSetup: 点击 Confirm
-        FFmpegSetup->>FFmpegSetup: isDownloading = true, showConfirm = false
-        FFmpegSetup->>Parent: emit("download")
-        Parent->>Main: download_ffmpeg()
-        Main-->>Parent: 下载结果
-        Note over FFmpegSetup: 5 秒后 isDownloading 自动恢复
-    end
+```
+后端: task_runner._run_task() 完成
+-> _emit("task_state_changed", {task_id, old_state, new_state: "completed"})
+-> useTaskQueue.ts: on("task_state_changed", handler)
+-> handler: 局部更新 task.state (乐观更新)
+-> handler: 检查 new_state === "completed" || new_state === "failed"
+  -> 是: 调用 fetchTasks() 完整重新获取
+  -> 否: 仅使用局部更新
+-> fetchTasks(): call("get_tasks") -> tasks.value = res.data
+-> TaskRow.vue: output_path 已填充 -> 显示"打开文件夹"按钮
 ```
 
-### 流程说明
+#### 流程说明:
 
-1. Download FFmpeg 按钮始终可见（不受 FFmpeg 当前状态影响）
-2. 点击后弹出 DaisyUI modal 确认对话框
-3. 用户确认后：设置 loading 状态 -> 触发 download 事件 -> 父组件处理后端调用
-4. 下载过程中按钮禁用并显示 spinner
-5. detecting 状态时按钮也禁用
+1. 后端任务完成/失败时广播 `task_state_changed` 事件，事件仅包含 `{task_id, old_state, new_state}`
+2. 前端先做乐观更新（局部修改 task.state），立即反映状态变化
+3. 对于终态（completed/failed），额外调用 `fetchTasks()` 获取完整数据（包括 output_path、error 等）
+4. 这样无需用户手动刷新页面，completed 任务立即显示"打开文件夹"按钮
+
+---
+
+### 打开文件夹流程
+
+<!-- v2.1.0-CHANGE: Phase 5 新增 -->
+
+```
+用户 -> TaskRow.vue: 看到 completed 任务的"打开文件夹"按钮
+-> 点击按钮 -> call("open_folder", task.output_path)
+-> main.py: open_folder(path)
+  -> folder = os.path.dirname(path) if os.path.isfile(path) else path
+  -> if sys.platform == "win32": os.startfile(folder)
+  -> elif sys.platform == "darwin": subprocess.Popen(["open", folder])
+  -> else: subprocess.Popen(["xdg-open", folder])
+  -> return {success: True}
+-> TaskRow.vue: 无需额外处理（调用静默失败）
+```
+
+#### 流程说明:
+
+1. 任务完成后，后端设置 `output_path`，前端通过重新获取任务列表获得该字段
+2. TaskRow 条件渲染：`task.state === 'completed' && task.output_path` 时显示按钮
+3. 点击后调用 `open_folder` Bridge API，后端根据平台选择打开方式
+4. 失败时前端静默处理（不弹错误提示），避免干扰用户操作
+
+---
 
 ## 主题切换流程
 
@@ -133,13 +287,18 @@ sequenceDiagram
 4. 异步保存到后端 settings.json（失败不影响本地主题）
 5. auto 模式下监听系统主题变化事件自动更新
 
+#### auto 模式解析:
+
+1. 启动时读取 settings.language，若为 "auto" 则读取 navigator.language
+2. 匹配优先级：zh-CN > zh > en > fallback "zh-CN"
+
 ---
 
-## Phase 3: 命令构建功能流程
-
-<!-- v2.1.0-CHANGE: Phase 3 新增命令构建相关流程 -->
+## 命令构建流程
 
 ### 硬件编码器检测流程
+
+<!-- v2.1.0-CHANGE: Phase 3 新增命令构建相关流程 -->
 
 ```mermaid
 sequenceDiagram
@@ -156,7 +315,7 @@ sequenceDiagram
     App->>App: 比对注册表，标记不可用硬件编码器
 ```
 
-### 流程说明
+#### 流程说明
 
 1. 命令配置页面加载时调用 `check_hw_encoders()` Bridge API
 2. 后端执行 `ffmpeg -encoders` 获取所有可用编码器
@@ -167,6 +326,8 @@ sequenceDiagram
 ---
 
 ### 视频剪辑流程
+
+<!-- v2.1.0-CHANGE: Phase 3 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -189,7 +350,7 @@ sequenceDiagram
     Main-->>Preview: ffmpeg -hide_banner -y -ss START -to END -accurate_seek -i "input" [-c copy] "output"
 ```
 
-### 流程说明
+#### 流程说明
 
 1. 用户在命令配置页的"剪辑"选项卡中操作
 2. 选择 extract 模式：输入开始时间和片尾时长，后端自动获取文件时长并计算结束时间
@@ -201,6 +362,8 @@ sequenceDiagram
 ---
 
 ### 多视频拼接流程
+
+<!-- v2.1.0-CHANGE: Phase 3 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -228,7 +391,7 @@ sequenceDiagram
     Note over Main: filter_complex: -filter_complex "concat=n=N:v=1:a=1"
 ```
 
-### 流程说明
+#### 流程说明
 
 1. 用户通过文件列表组件添加 2 个或以上视频文件
 2. 支持拖拽排序调整拼接顺序
@@ -240,6 +403,8 @@ sequenceDiagram
 ---
 
 ### 音频字幕混合流程
+
+<!-- v2.1.0-CHANGE: Phase 3 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -256,7 +421,7 @@ sequenceDiagram
     Main-->>Preview: ffmpeg -i "video.mp4" -i "audio.mp3" -i "subs.srt" -map 0:v -map 1:a [-map 2:s -c:s mov_text -metadata:s:s:0 language=eng] "output.mp4"
 ```
 
-### 流程说明
+#### 流程说明
 
 1. 用户在"音频/字幕"选项卡中操作
 2. 通过 FileDropInput 组件拖拽或选择外部音频/字幕文件
@@ -268,6 +433,8 @@ sequenceDiagram
 ---
 
 ### 横竖屏转换流程
+
+<!-- v2.1.0-CHANGE: Phase 3 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -293,7 +460,7 @@ sequenceDiagram
     end
 ```
 
-### 流程说明
+#### 流程说明
 
 1. 用户在滤镜配置中选择 aspect_convert 模式
 2. I 模式（H2V-I/V2H-I）需额外提供背景图片
@@ -304,11 +471,9 @@ sequenceDiagram
 
 ---
 
-## Phase 3.5: 命令构建改进流程
-
-<!-- v2.1.0-CHANGE: Phase 3.5 新增质量参数自动填充、自定义命令、片头片尾等流程 -->
-
 ### 编码器质量自动填充流程
+
+<!-- v2.1.0-CHANGE: Phase 3.5 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -335,7 +500,7 @@ sequenceDiagram
     end
 ```
 
-### 流程说明
+#### 流程说明
 
 1. 用户从 EncoderSelect 下拉列表选择预设编码器
 2. 组件查找编码器注册表中的 `recommendedQuality` 和 `qualityMode`
@@ -347,6 +512,8 @@ sequenceDiagram
 ---
 
 ### 自定义命令流程
+
+<!-- v2.1.0-CHANGE: Phase 3.5 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -364,7 +531,7 @@ sequenceDiagram
     Config->>Config: 优先使用 custom_command，跳过其他模式
 ```
 
-### 流程说明
+#### 流程说明
 
 1. 用户通过导航栏或路由进入自定义命令页面
 2. 页面设置 `activeMode = "custom"`
@@ -377,6 +544,8 @@ sequenceDiagram
 ---
 
 ### 片头片尾拼接流程
+
+<!-- v2.1.0-CHANGE: Phase 3.5 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -400,7 +569,7 @@ sequenceDiagram
     Note over User: 任务出现在 Queue 页面中
 ```
 
-### 流程说明
+#### 流程说明
 
 <!-- v2.1.0-CHANGE: Phase 3.5.2 更新 Intro/Outro 流程 -->
 
@@ -414,6 +583,8 @@ sequenceDiagram
 ---
 
 ### 剪辑条件包含流程
+
+<!-- v2.1.0-CHANGE: Phase 3.5 新增条件包含规则 -->
 
 ```mermaid
 sequenceDiagram
@@ -433,7 +604,7 @@ sequenceDiagram
     end
 ```
 
-### 流程说明
+#### 流程说明
 
 1. `toTaskConfig()` 检查 clip 的 start_time 和 end_time_or_duration 是否有值
 2. 均为空时，`clip` 字段设为 `null`，不传递给 `build_command`
@@ -441,7 +612,9 @@ sequenceDiagram
 
 ---
 
-### 滤镜互斥清理流程 (Phase 3.5.1)
+### 滤镜互斥清理流程
+
+<!-- v2.1.0-CHANGE: Phase 3.5.1 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -466,15 +639,17 @@ sequenceDiagram
     end
 ```
 
-### 流程说明
+#### 流程说明
 
 1. FilterForm 通过 `watch` 监听 `aspect_convert` 和 `rotate` 的变化
 2. 选择 aspect_convert 时自动清空 rotate，选择 rotate 时自动清空 aspect_convert
-3. 修复了此前两个选项可能同时被 disabled 导致的"冻结"问题
+3. 修复了此前两个选项可能同时被禁用的 bug，确保始终可以取消选择
 
 ---
 
-### Merge 独立提交流程 (Phase 3.5.2-fixes)
+### Merge 独立提交流程
+
+<!-- v2.1.0-CHANGE: Phase 3.5.2-fixes 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -495,7 +670,7 @@ sequenceDiagram
     Note over User: 自动跳转到 Queue 页面，可见 1 个合并任务
 ```
 
-### 流程说明
+#### 流程说明
 
 1. 用户在 Merge 页面配置合并参数并添加文件
 2. 命令预览使用本地 `mergeConfig`（不引用全局 merge 单例，避免与 Config 页面 intro/outro 冲突）
@@ -505,7 +680,9 @@ sequenceDiagram
 
 ---
 
-### Concat 列表文件创建流程 (Phase 3.5.2-fixes)
+### Concat 列表文件创建流程
+
+<!-- v2.1.0-CHANGE: Phase 3.5.2-fixes 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -524,7 +701,7 @@ sequenceDiagram
     TaskRunner->>TempFile: try/finally: os.unlink(temp_path)
 ```
 
-### 流程说明
+#### 流程说明
 
 1. `build_merge_command` 返回 `list.txt` 作为占位符（预览和执行用同一函数）
 2. `start_task` 在构建完命令后检查是否为 concat demuxer 模式
@@ -535,7 +712,9 @@ sequenceDiagram
 
 ---
 
-### Intro/Outro 全局应用流程 (Phase 3.5.2-fixes)
+### Intro/Outro 全局应用流程
+
+<!-- v2.1.0-CHANGE: Phase 3.5.2-fixes 新增 -->
 
 ```mermaid
 sequenceDiagram
@@ -548,17 +727,17 @@ sequenceDiagram
     Config->>GlobalConfig: merge.intro_path = path
     GlobalConfig->>GlobalConfig: watch: auto-set merge_mode = "filter_complex"
     Note over GlobalConfig: configRef 始终包含 merge（intro/outro 有值时）
-
+    
     Queue->>Backend: addTasks(paths, toTaskConfig())
     Note over Backend: 每个文件创建一个任务，config 包含 merge.intro_path/outro_path
-
+    
     Queue->>Backend: startTask(id, toTaskConfig())
     Backend->>Backend: build_command(task.config, input, output)
     Note over Backend: 检测 config.merge.intro_path/outro_path -> build_merge_intro_outro_command
     Backend->>Backend: 命令: -i intro -i content -i outro -filter_complex "concat=n=3:v=1:a=1"
 ```
 
-### 流程说明
+#### 流程说明
 
 1. Config 页面设置 intro/outro → 全局 reactive merge 更新 → watch 自动设 merge_mode 为 filter_complex
 2. `toTaskConfig()` 在 intro/outro 有值时始终包含 merge 配置（无论当前 activeMode）
@@ -566,11 +745,13 @@ sequenceDiagram
 4. 任务启动时 `build_command` 检测 intro/outro → 调度到 `build_merge_intro_outro_command`
 5. Merge 页面任务不受影响：`start_task` 保留任务已有的 merge 配置
 
-<!-- v2.1.0-CHANGE: Phase 4 新增流程 -->
+---
 
-## Phase 4: 国际化与平台化流程
+## 国际化与平台化流程
 
 ### 语言切换流程
+
+<!-- v2.1.0-CHANGE: Phase 4 新增 -->
 
 ```
 用户 -> AppNavbar.vue: 点击语言切换按钮 (CN/EN)
@@ -585,7 +766,11 @@ sequenceDiagram
 1. 启动时读取 settings.language，若为 "auto" 则读取 navigator.language
 2. 匹配优先级：zh-CN > zh > en > fallback "zh-CN"
 
+---
+
 ### 数据目录迁移流程
+
+<!-- v2.1.0-CHANGE: Phase 4 新增 -->
 
 ```
 main.py 启动
@@ -607,70 +792,87 @@ main.py 启动
 3. `core/logging.py` 导入时使用 `core.paths.get_log_dir()`
 4. `core/preset_manager.py` 导入时使用 `core.paths.get_presets_dir()`
 
-### FFmpeg 平台下载流程
+---
+
+## v2.1.1: 性能优化与改进流程
+
+### 命令预览流程（重写）
+
+<!-- v2.1.1-CHANGE: 重写命令预览流程，合并 IPC、添加竞态保护和 debounce 策略 -->
 
 ```
-用户 -> SettingsPage -> FFmpegSetup.vue: 点击按钮
--> if platform === "win32":
-  -> 弹出 DaisyUI modal 确认对话框
-  -> 确认 -> call("download_ffmpeg")
-  -> main.py: static_ffmpeg.add_paths() 下载
-  -> 成功 -> ffmpeg_version_changed 事件
--> else:
-  -> 显示平台安装提示 (非按钮，静态文本)
-  -> macOS: "brew install ffmpeg" + brew.sh 链接
-  -> Linux: 对应包管理器命令
+用户修改参数 -> Vue reactive state 更新
+-> useGlobalConfig.configRef (computed) 重新求值
+-> useCommandPreview watch 触发（无 deep, immediate: true）
+-> scheduleUpdate():
+  -> if (validating): pendingUpdate = true; return
+  -> debounceTimer = setTimeout(updatePreview, 500)
+-> updatePreview():
+  -> validating = true
+  -> myId = ++requestId
+  -> 单次 call("preview_command", config)（合并 validate + build）
+  -> 后端:
+    -> TaskConfig.from_dict(config)
+    -> validate_task_config(task_config, preview_mode=True)  // 跳过 watermark 文件检查
+    -> build_command_preview(task_config)
+    -> 返回: {command, errors[{param, message}], warnings[{param, message}]}
+  -> if (myId !== requestId): return  // 丢弃过期响应
+  -> 应用结果到 commandText / errors / warnings
+  -> validating = false
+  -> if (pendingUpdate):
+    -> pendingUpdate = false
+    -> scheduleUpdate()  // 触发下一次更新
+-> Vue re-render
 ```
 
-**非 Windows 调用 download_ffmpeg**:
-```
-main.py: download_ffmpeg()
--> sys.platform != "win32"
--> 返回 {"success": False, "error": "download_not_supported", "data": {"platform": "darwin", "instructions": {"method": "homebrew", "command": "brew install ffmpeg", "url": "https://brew.sh"}}}
-```
+#### 延迟预估:
+
+- 首次触发: ~1ms reactive + 500ms debounce + 10-50ms IPC + <2ms 后端 = ~520-560ms
+- 连续输入: 仅 ~520ms 延迟一次（in-flight 保护避免请求堆积）
+- 对比 v2.1.0: ~1ms reactive + 300ms debounce + 2x(10-50ms IPC) + <4ms 后端 = ~320-450ms x2
+
+#### 关键优化:
+
+1. **合并 IPC**: 2 次进程间往返 -> 1 次，减少 20-100ms
+2. **竞态保护**: requestId 校验避免慢响应覆盖新结果，消除命令文本闪烁
+3. **移除 deep: true**: configRef 是 computed 返回新对象，Vue 已自动追踪内部依赖，deep 为冗余
+4. **in-flight 保护**: 请求进行中时标记 pending 而非堆积请求
+5. **preview_mode**: 跳过 watermark Path.exists() 检查，避免输入过程中产生误导性错误
 
 ---
 
-## Phase 5: 第二阶段用户体验优化流程
+### 文件探测异步流程（新增）
 
-<!-- v2.1.0-CHANGE: Phase 5 新增打开文件夹流程、任务状态变更重新获取流程 -->
-
-### 打开文件夹流程
+<!-- v2.1.1-CHANGE: 新增文件探测异步流程，替代同步阻塞的 probe_file -->
 
 ```
-用户 -> TaskRow.vue: 看到 completed 任务的"打开文件夹"按钮
--> 点击按钮 -> call("open_folder", task.output_path)
--> main.py: open_folder(path)
-  -> folder = os.path.dirname(path) if os.path.isfile(path) else path
-  -> if sys.platform == "win32": os.startfile(folder)
-  -> elif sys.platform == "darwin": subprocess.Popen(["open", folder])
-  -> else: subprocess.Popen(["xdg-open", folder])
-  -> return {success: True}
--> TaskRow.vue: 无需额外处理（调用静默失败）
+用户批量添加文件
+-> call("add_tasks", {paths: [...], config: {...}})
+-> main.py add_tasks():
+  -> 创建占位任务（file_name=文件名, duration=0, file_size=0）
+  -> tasks.append(task)
+  -> _queue.add_tasks(tasks)  // 原子添加
+  -> 启动后台线程 threading.Thread(target=_probe_bg, daemon=True):
+    -> for task in tasks:
+      -> info = probe_file(task.file_path)
+      -> task.file_name = info.get("file_name", ...)
+      -> task.duration_seconds = info.get("duration", 0)
+      -> task.file_size_bytes = info.get("file_size", 0)
+      -> _emit("task_info_updated", {task_id, file_name, duration_seconds, file_size_bytes})
+  -> 立即返回 [t.to_dict() for t in tasks]
+-> 前端:
+  -> TaskRow 显示占位数据（duration 为 "0:00"，file_name 为文件名）
+  -> 监听 task_info_updated 事件:
+    -> 局部更新对应 task 的 file_name / duration / file_size
+    -> Vue re-render: TaskRow 显示完整信息
 ```
 
-**流程说明**:
-1. 任务完成后，后端设置 `output_path`，前端通过重新获取任务列表获得该字段
-2. TaskRow 条件渲染：`task.state === 'completed' && task.output_path` 时显示按钮
-3. 点击后调用 `open_folder` Bridge API，后端根据平台选择打开方式
-4. 失败时前端静默处理（不弹错误提示），避免干扰用户操作
+#### v2.1.0 对比:
 
-### 任务状态变更重新获取流程
+- 同步: 10 个文件 ~0.5-2s 阻塞主线程，50 个文件 ~2.5-10s 阻塞
+- 异步: 主线程立即返回，后台逐个 probe，UI 始终响应
 
-```
-后端: task_runner._run_task() 完成
--> _emit("task_state_changed", {task_id, old_state, new_state: "completed"})
--> useTaskQueue.ts: on("task_state_changed", handler)
--> handler: 局部更新 task.state (乐观更新)
--> handler: 检查 new_state === "completed" || new_state === "failed"
-  -> 是: 调用 fetchTasks() 完整重新获取
-  -> 否: 仅使用局部更新
--> fetchTasks(): call("get_tasks") -> tasks.value = res.data
--> TaskRow.vue: output_path 已填充 -> 显示"打开文件夹"按钮
-```
+#### 错误处理:
 
-**流程说明**:
-1. 后端任务完成/失败时广播 `task_state_changed` 事件，事件仅包含 `{task_id, old_state, new_state}`
-2. 前端先做乐观更新（局部修改 task.state），立即反映状态变化
-3. 对于终态（completed/failed），额外调用 `fetchTasks()` 获取完整数据（包括 output_path、error 等）
-4. 这样无需用户手动刷新页面，completed 任务立即显示"打开文件夹"按钮
+- 单个文件 probe 失败不影响其他文件
+- probe 失败时保持占位数据（duration=0），不触发 task_info_updated 事件

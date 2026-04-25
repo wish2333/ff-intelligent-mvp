@@ -38,7 +38,7 @@ export function useTheme() {
   function toggleTheme(): void {
     const resolved = resolveTheme(currentTheme.value)
     const next = resolved === "dark" ? "light" : "dark"
-    setTheme(next)
+    setTheme(next).catch(() => { /* theme still applied locally */ })
   }
 
   let mediaQueryHandler: (() => void) | null = null

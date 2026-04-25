@@ -6,24 +6,52 @@
  * and displays any validation errors/warnings below it.
  */
 
+import { ref } from "vue"
 import { useI18n } from "vue-i18n"
 
 const { t } = useI18n()
 
+interface ValidationItem {
+  param: string
+  message: string
+}
+
 defineProps<{
   commandText: string
-  errors: string[]
-  warnings: string[]
+  errors: ValidationItem[]
+  warnings: ValidationItem[]
   validating: boolean
 }>()
 
-function copyCommand() {
-  const text = document.getElementById("command-preview-text")?.textContent
-  if (text) {
-    navigator.clipboard.writeText(text).catch(() => {
-      // Fallback: select text for manual copy
-    })
+const copied = ref(false)
+
+function copyCommand(commandText: string) {
+  if (!commandText) return
+  const fallback = () => {
+    const textarea = document.createElement("textarea")
+    textarea.value = commandText
+    textarea.style.position = "fixed"
+    textarea.style.opacity = "0"
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand("copy")
+    document.body.removeChild(textarea)
+    showCopied()
   }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(commandText).then(showCopied).catch(fallback)
+  } else {
+    fallback()
+  }
+}
+
+function showCopied() {
+  copied.value = true
+  setTimeout(() => { copied.value = false }, 1500)
+}
+
+function formatItem(item: ValidationItem): string {
+  return item.param ? `${item.param}: ${item.message}` : item.message
 }
 </script>
 
@@ -34,10 +62,11 @@ function copyCommand() {
         <h2 class="card-title text-sm font-semibold">{{ t("config.commandPreview.title") }}</h2>
         <button
           class="btn btn-ghost btn-xs"
-          @click="copyCommand"
+          @click="copyCommand(commandText)"
           :disabled="!commandText"
         >
-          {{ t("config.commandPreview.copy") }}
+          <span v-if="copied">{{ t("common.copied") }}</span>
+          <span v-else>{{ t("config.commandPreview.copy") }}</span>
         </button>
       </div>
 
@@ -47,7 +76,7 @@ function copyCommand() {
       >
         <span v-if="validating" class="loading loading-spinner loading-xs mr-2"></span>
         <span v-if="validating" class="text-base-content/50">{{ t("config.commandPreview.updating") }}</span>
-        <span v-else-if="commandText" id="command-preview-text">{{ commandText }}</span>
+        <span v-else-if="commandText">{{ commandText }}</span>
         <span v-else class="text-base-content/50">
           {{ t("config.commandPreview.noConfig") }}
         </span>
@@ -61,7 +90,7 @@ function copyCommand() {
           :key="'err-' + idx"
           class="alert alert-error py-1 px-3 text-xs"
         >
-          <span>{{ err }}</span>
+          <span>{{ formatItem(err) }}</span>
         </div>
 
         <!-- Warnings -->
@@ -70,7 +99,7 @@ function copyCommand() {
           :key="'warn-' + idx"
           class="alert alert-warning py-1 px-3 text-xs"
         >
-          <span>{{ warn }}</span>
+          <span>{{ formatItem(warn) }}</span>
         </div>
       </div>
 

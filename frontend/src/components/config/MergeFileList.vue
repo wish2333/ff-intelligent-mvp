@@ -6,7 +6,7 @@
  * Phase 3.5.2: add deduplication, fullscreen drag-drop.
  */
 
-import { ref, onMounted, onUnmounted } from "vue"
+import { ref, onMounted, onUnmounted, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { call } from "../../bridge"
 
@@ -21,12 +21,34 @@ const emit = defineEmits<{
 }>()
 
 const draggedIndex = ref<number | null>(null)
+const dragOverIndex = ref<number | null>(null)
 const isFullscreenDragging = ref(false)
 let fsDragCounter = 0
+let nextKeyId = 0
+const fileKeyMap = new Map<string, number>()
+
+function getFileKey(path: string): number {
+  if (!fileKeyMap.has(path)) {
+    fileKeyMap.set(path, ++nextKeyId)
+  }
+  return fileKeyMap.get(path)!
+}
+
+// Clean up keys for removed files
+watch(() => props.modelValue, (list) => {
+  const currentPaths = new Set(list)
+  for (const path of fileKeyMap.keys()) {
+    if (!currentPaths.has(path)) {
+      fileKeyMap.delete(path)
+    }
+  }
+})
 
 function emitUpdate(list: string[]) {
   emit("update:modelValue", [...list])
 }
+
+const alertMessage = ref("")
 
 async function addFiles() {
   try {
@@ -34,8 +56,9 @@ async function addFiles() {
     if (res.success && res.data && res.data.length > 0) {
       emitUpdate([...props.modelValue, ...res.data])
     }
-  } catch {
-    // silently fail
+  } catch (err) {
+    alertMessage.value = t("common.operationFailed") + ": " + (err as Error).message
+    setTimeout(() => { alertMessage.value = "" }, 3000)
   }
 }
 
@@ -61,20 +84,26 @@ function moveDown(index: number) {
 
 function onDragStart(index: number) {
   draggedIndex.value = index
+  dragOverIndex.value = null
 }
 
 function onDragOver(e: DragEvent, index: number) {
   e.preventDefault()
   if (draggedIndex.value === null || draggedIndex.value === index) return
-  const list = [...props.modelValue]
-  const item = list.splice(draggedIndex.value, 1)[0]
-  list.splice(index, 0, item)
-  emitUpdate(list)
-  draggedIndex.value = index
+  // Only update visual indicator, don't modify reactive data during dragover
+  dragOverIndex.value = index
 }
 
 function onDragEnd() {
+  // Only emit the final position when drag ends
+  if (draggedIndex.value !== null && dragOverIndex.value !== null && draggedIndex.value !== dragOverIndex.value) {
+    const list = [...props.modelValue]
+    const item = list.splice(draggedIndex.value, 1)[0]
+    list.splice(dragOverIndex.value, 0, item)
+    emitUpdate(list)
+  }
   draggedIndex.value = null
+  dragOverIndex.value = null
 }
 
 function getFileName(path: string): string {
@@ -128,6 +157,7 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-1">
+    <div v-if="alertMessage" class="alert alert-error py-1 px-3 text-xs">{{ alertMessage }}</div>
     <!-- Fullscreen drag overlay -->
     <div
       v-if="isFullscreenDragging"
@@ -147,11 +177,11 @@ onUnmounted(() => {
     <div class="space-y-1">
       <div
         v-for="(file, index) in modelValue"
-        :key="index"
+        :key="getFileKey(file)"
         class="flex items-center gap-2 rounded-lg border border-base-300 px-3 py-1.5 text-sm transition-colors"
         :class="{
-          'opacity-50': draggedIndex === index,
-          'bg-primary/10 border-primary/30': draggedIndex === index,
+          'opacity-50': draggedIndex === index && dragOverIndex !== index,
+          'bg-primary/10 border-primary/30': dragOverIndex === index && draggedIndex !== index,
         }"
         draggable="true"
         @dragstart="onDragStart(index)"
@@ -170,7 +200,7 @@ onUnmounted(() => {
         <div class="flex gap-0.5 shrink-0">
           <button
             class="btn btn-xs btn-ghost btn-square"
-            title="Move up"
+            :title="t('mergePage.fileList.moveUp')"
             :disabled="index === 0"
             @click="moveUp(index)"
           >
@@ -180,7 +210,7 @@ onUnmounted(() => {
           </button>
           <button
             class="btn btn-xs btn-ghost btn-square"
-            title="Move down"
+            :title="t('mergePage.fileList.moveDown')"
             :disabled="index === modelValue.length - 1"
             @click="moveDown(index)"
           >
@@ -190,7 +220,7 @@ onUnmounted(() => {
           </button>
           <button
             class="btn btn-xs btn-ghost btn-square text-error"
-            title="Remove"
+            :title="t('mergePage.fileList.remove')"
             @click="removeFile(index)"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">

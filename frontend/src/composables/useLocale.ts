@@ -40,7 +40,7 @@ export function useLocale() {
 
   function toggleLocale(): void {
     const next = currentLocale.value === "zh-CN" ? "en" : "zh-CN"
-    setLocale(next)
+    setLocale(next).catch(() => { /* locale still applied locally */ })
   }
 
   onMounted(async () => {

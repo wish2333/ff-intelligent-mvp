@@ -99,6 +99,7 @@ const fileDurationText = computed(() => {
 })
 
 // Auto-fetch file duration for extract mode
+const alertMessage = ref("")
 watch(
   () => [isExtractMode.value, props.filePath],
   async ([isExtract, filePath]) => {
@@ -108,8 +109,9 @@ watch(
         if (res.success && res.data != null) {
           fileDuration.value = res.data
         }
-      } catch {
-        // silently fail
+      } catch (err) {
+        alertMessage.value = t("common.operationFailed") + ": " + (err as Error).message
+        setTimeout(() => { alertMessage.value = "" }, 3000)
       }
     }
   },
@@ -120,6 +122,7 @@ watch(
 <template>
   <div class="card bg-base-200 shadow-sm border border-base-300">
     <div class="card-body p-4">
+      <div v-if="alertMessage" class="alert alert-error py-1 px-3 text-xs mb-2">{{ alertMessage }}</div>
       <h2 class="card-title text-sm font-semibold mb-3">{{ t("config.clip.title") }}</h2>
       <p class="text-xs text-base-content/60 mb-3">
         {{ t("config.clip.description") }}

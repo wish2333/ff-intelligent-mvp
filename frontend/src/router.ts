@@ -41,6 +41,10 @@ const router = createRouter({
       name: "Settings",
       component: () => import("./pages/SettingsPage.vue"),
     },
+    {
+      path: "/:pathMatch(.*)*",
+      redirect: "/",
+    },
   ],
 })
 
