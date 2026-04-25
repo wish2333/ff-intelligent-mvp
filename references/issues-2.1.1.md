@@ -353,3 +353,305 @@ fix(encode): 修复编码选项异常与预设配置
 - 修复内置 H.264/H.265 预设参数不符合推荐标准的问题（已升级为质量优先模式）
 - 修复"提取音频 (WAV)"预设无法正确输出 WAV 格式的问题
 ```
+
+## 队列页添加预设
+
+```
+  New file: frontend/src/components/task-queue/QueuePresetSelect.vue
+  - Compact inline preset dropdown with label
+  - Groups presets into built-in / custom (reuses existing i18n keys)
+  - Immediately emits apply event on selection
+
+  Modified files:
+  - TaskQueuePage.vue - Added QueuePresetSelect between toolbar and batch controls; handlePresetApply loads preset
+  config into global config via loadFromTaskConfig()
+  - zh-CN.ts / en.ts - Added taskQueue.preset.label and taskQueue.preset.selectPreset
+
+  Flow: Select a preset -> global config updates -> "Start All Pending" uses the preset config for all pending tasks.
+
+  ---
+  Manual test items:
+  1. Open queue page, verify preset dropdown appears between toolbar and batch controls
+  2. Select a built-in preset (e.g. "MP4 H.264") - verify no error and dropdown shows selection
+  3. Navigate to Command Config page - verify the transcode settings match the selected preset
+  4. Select a custom preset if any exist - verify it applies correctly
+  5. Verify batch operations (start all, pause, etc.) still work normally
+  6. Verify the dropdown loads presets on page mount (no empty state if presets exist)
+```
+
+       #2301  11:44 PM  🔵  Located preset-related files in video processing application
+       #2302            🔵  Located queue page and existing preset infrastructure
+     General
+       #2303            🔵  Identified task-queue component structure and batch control UI
+     frontend/src/components/config/PresetSelector.vue
+       #2304            🔵  Examined preset system architecture and API contracts
+     main.py
+       #2305            🔵  Identified backend preset API endpoints and architecture
+     core/preset_manager.py
+       #2306            🔵  Examined PresetManager implementation and preset storage architecture
+       #2307  11:45 PM  🔵  Examined preset persistence and deletion mechanisms
+     frontend/src/pages/TaskQueuePage.vue
+       #2308            🔵  Analyzed TaskQueuePage structure and data model architecture
+       #2309            🔵  Identified target location for preset selection UI in TaskQueuePage
+     frontend/src/composables/usePresets.ts
+       #2310            🔵  Found existing preset config application pattern in CommandConfigPage
+     frontend/src/components/task-queue/BatchControlBar.vue
+       #2311            🔵  Examined BatchControlBar component structure and UI layout
+     frontend/src/pages/CommandConfigPage.vue
+       #2312            🔵  Identified preset application pattern and TaskToolbar structure
+     main.py
+       #2313  11:46 PM  🔵  Confirmed backend preset API endpoints and frontend type definitions
+     frontend/src/composables/usePresets.ts
+       #2314            🔵  Analyzed usePresets composable API and preset config extraction
+     General
+       #2315            🔵  Verified preset storage directories and default presets file
+     frontend/src/components/config/PresetSelector.vue
+       #2316  11:47 PM  🔵  Analyzed PresetSelector component implementation and default preset structure
+     frontend/src/types/preset.ts
+       #2317            🔵  Completed comprehensive preset system architecture exploration
+     frontend/src/pages/CommandConfigPage.vue
+       #2318            🔵  Found complete preset selection reference implementation in CommandConfigPage
+     frontend/src/composables/useTaskControl.ts
+       #2319            🔵  Analyzed task control and queue composables for batch operation patterns
+     frontend/src/composables/useGlobalConfig.ts
+       #2321  11:49 PM  🔵  Analyzed useGlobalConfig composable state management architecture
+     frontend/src/i18n/locales/en.ts
+       #2322  11:51 PM  🔵  Discovered existing i18n translation keys for preset UI elements
+     frontend/src/i18n/locales/zh-CN.ts
+       #2323            🔵  Found existing taskQueue i18n translation structure in locale files
+     General
+       #2325            🔵  Transitioned from discovery to implementation phase with structured task breakdown
+     frontend/src/components/task-queue/QueuePresetSelect.vue
+       #2326            🟣  Implemented QueuePresetSelect.vue component for queue page preset selection
+     frontend/src/pages/TaskQueuePage.vue
+       #2327            🟣  Added QueuePresetSelect component import to TaskQueuePage
+       #2328  11:52 PM  🟣  Added handlePresetApply function to TaskQueuePage for preset application
+       #2329            🟣  Integrated QueuePresetSelect component into TaskQueuePage template
+     frontend/src/i18n/locales/zh-CN.ts
+       #2330            🟣  Added Chinese i18n translations for queue preset selector
+     frontend/src/i18n/locales/en.ts
+       #2331  11:55 PM  🟣  Completed i18n translations for queue preset selector
+     General
+       #2333  11:57 PM  🔴  UI element positioning corrected
+     ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\task-queue\TaskToolbar.vue
+       #2334            🔵  TaskToolbar component structure examined
+     ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\pages\TaskQueuePage.vue
+       #2335            🔴  QueuePresetSelect positioning corrected to right-align with toolbar
+     ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\task-queue\QueuePresetSelect.vue
+       #2336  11:58 PM  🔴  QueuePresetSelect dropdown width fixed
+
+## 其他问题
+
+- fix：队列页状态栏固定长度，应该都是显示三个汉字吧，要确保能完整显示三个字（现在第三个字会换行）
+  - Added whitespace-nowrap to the state badge，防止三个汉字换行。
+
+     Apr 26, 2026
+    
+     ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\pages\TaskQueuePage.vue
+       #2338  3:13 AM  🔴  Fixed status tag display to prevent text wrapping in queue page
+     ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\task-queue\TaskRow.vue
+       #2339  3:14 AM  🔴  Fixed status badge text wrapping in task queue rows
+
+- fix：现在各个拖拽放入文件的地方是不是都是限定一些格式才能正确导入，好像点击选择文件并不受这个限制，你帮我看看现在这两个功能都是怎么实现的。调用validateExtension()的这些地方的格式过滤有覆盖不全的地方，如果后期开发人员或者用户需要修改找代码会有点麻烦，能否把这些支持格式的配置单领出来放到 @presets\ 文件夹中，以便修改
+
+  - Plan
+
+    ```
+     Plan: Extract file format configs to centralized file_formats.json
+    
+     Context
+    
+     File extension validations for drag-and-drop and click-to-select are currently hardcoded in Vue components. This makes
+      maintenance difficult - developers must search across multiple files to find and update supported formats. The user
+     wants to centralize these configs in presets/file_formats.json.
+    
+     Changes
+    
+     1. Create presets/file_formats.json
+    
+     Centralized format config by usage category:
+    
+     {
+       "audio": ".mp3,.aac,.flac,.wav,.m4a,.ogg,.wma",
+       "subtitle": ".srt,.ass,.ssa",
+       "video": ".mp4,.mkv,.avi,.mov,.ts,.m2ts",
+       "image": ".png,.jpg,.jpeg,.bmp,.webp"
+     }
+    
+     Categories correspond to the distinct groups found across components:
+     - audio - used in AvsmixForm, AudioSubtitlePage (left)
+     - subtitle - used in AvsmixForm, AudioSubtitlePage (right)
+     - video - used in MergeSettingsForm (both sides)
+     - image - used in FilterForm (background + watermark)
+    
+     2. Create frontend composable src/composables/useFileFormats.ts
+    
+     Load formats from file_formats.json, expose as a typed object. Also add a getFileTypesParam() helper that converts
+     extensions to pywebview file_types format for backend filtering.
+    
+     3. Update main.py - select_file_filtered
+    
+     Pass _file_types parameter to create_file_dialog(file_types=...) so the system file dialog also filters by extension.
+     Same for select_files.
+    
+     4. Update Vue components
+    
+     Replace hardcoded accept strings with references to the composable:
+    
+     ┌───────────────────────┬──────────┬──────────────────────────┬──────────────────────────────────────────┐
+     │         File          │ Line(s)  │         Current          │               Replace With               │
+     ├───────────────────────┼──────────┼──────────────────────────┼──────────────────────────────────────────┤
+     │ AvsmixForm.vue        │ 37, 76   │ hardcoded audio/subtitle │ fileFormats.audio / fileFormats.subtitle │
+     ├───────────────────────┼──────────┼──────────────────────────┼──────────────────────────────────────────┤
+     │ AudioSubtitlePage.vue │ 71-72    │ hardcoded audio/subtitle │ fileFormats.audio / fileFormats.subtitle │
+     ├───────────────────────┼──────────┼──────────────────────────┼──────────────────────────────────────────┤
+     │ FilterForm.vue        │ 160, 234 │ hardcoded image          │ fileFormats.image                        │
+     ├───────────────────────┼──────────┼──────────────────────────┼──────────────────────────────────────────┤
+     │ MergeSettingsForm.vue │ 83-84    │ hardcoded video          │ fileFormats.video                        │
+     └───────────────────────┴──────────┴──────────────────────────┴──────────────────────────────────────────┘
+    
+     5. Update FileDropInput.vue - openFileDialog
+    
+     Pass accept prop to backend select_file_filtered so the OS dialog pre-filters.
+    
+     Files Modified
+    
+     - presets/file_formats.json (new)
+     - frontend/src/composables/useFileFormats.ts (new)
+     - main.py - select_file_filtered, select_files
+     - frontend/src/components/common/FileDropInput.vue
+     - frontend/src/components/config/AvsmixForm.vue
+     - frontend/src/pages/AudioSubtitlePage.vue
+     - frontend/src/components/config/FilterForm.vue
+     - frontend/src/components/config/MergeSettingsForm.vue
+    
+     Verification
+    
+     1. Build: cd frontend && bun run build - no errors
+     2. Manual test: drag-and-drop and click-to-select on each page (transcode, filter, audio/subtitle, merge) - verify
+     format validation still works
+     3. Check that non-matching files show error提示
+    ```
+
+  - 构建完成
+
+    ```
+      新增文件
+    
+      - presets/file_formats.json — 用户可编辑的格式配置源
+      - frontend/src/config/file_formats.json — 构建用的副本（两个保持一致即可）
+      - frontend/src/composables/useFileFormats.ts — composable，导出 fileFormats 对象和 toWebViewFileTypes() 转换函数
+    
+      修改文件
+    
+      - main.py — select_file_filtered 和 select_files 的 file_types 参数改为 list | None，实际传递给 pywebview 的
+      create_file_dialog
+      - FileDropInput.vue — 点击选择时将 accept 转为 pywebview 格式传给后端，OS 文件对话框现在也会预过滤格式
+      - AvsmixForm.vue — accept 改为 :accept="fileFormats.audio" / fileFormats.subtitle
+      - AudioSubtitlePage.vue — left-accept / right-accept 改为引用 fileFormats
+      - FilterForm.vue — 两处 accept 改为 :accept="fileFormats.image"
+      - MergeSettingsForm.vue — 两处改为 :left-accept="fileFormats.video"
+      - tsconfig.json — 开启 resolveJsonModule
+    
+      手动测试项
+    
+      1. 转码页 — 点击选择音频/字幕文件，确认系统对话框只显示对应格式
+      2. 滤镜页 — 点击选择背景图/水印图，确认只显示图片格式
+      3. 音频字幕页 — 拖拽音频到左半屏、字幕到右半屏，格式验证正常
+      4. 合并页 — 拖拽视频到左右区域，格式验证正常
+      5. 任何页面 — 拖拽不支持的格式文件，应显示错误提示
+      6. 修改 presets/file_formats.json 添加新格式（如 .webm），刷新页面验证生效
+    ```
+
+  - 优化file_formats.json加载
+
+    ```
+      - 唯一配置文件：presets/file_formats.json
+      - 后端 get_file_formats() API 读取它
+      - 前端 composable 首次调用时从后端加载一次，之后全部走内存缓存
+      - 用户修改 presets/file_formats.json 后重启应用即生效
+    ```
+
+  - CC-Mem
+
+         Apr 26, 2026
+        
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\config\AvsmixForm.vue
+           #2413  3:55 AM  🔄  AvsmixForm uses centralized subtitle file format configuration
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\pages\AudioSubtitlePage.vue
+           #2414  3:56 AM  🔵  AudioSubtitlePage imports SplitDropZone and composables
+           #2415           🔄  AudioSubtitlePage imports useFileFormats composable
+           #2416           🔄  AudioSubtitlePage uses centralized file format configuration
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\config\FilterForm.vue
+           #2417           🔵  FilterForm imports computed, watch, and i18n
+           #2418           🔄  FilterForm imports useFileFormats composable
+           #2419           🔄  FilterForm uses centralized image file format configuration
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\config\MergeSettingsForm.vue
+           #2420           🔵  MergeSettingsForm imports SplitDropZone for intro/outro videos
+           #2421           🔄  MergeSettingsForm imports useFileFormats composable
+           #2422           🔄  MergeSettingsForm uses centralized video file format configuration
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\composables\useFileFormats.ts
+           #2423           🟣  Implemented unified file type filtering system across application
+           #2424           🟣  Implemented unified file type filtering across application
+         General
+           #2425  4:02 AM  🔵  Frontend build failed with TypeScript errors
+           #2426           🔵  Import path for file_formats.json is incorrect
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\tsconfig.json
+           #2427           🔵  tsconfig.json missing resolveJsonModule option
+           #2428  4:03 AM  🔴  Added resolveJsonModule to tsconfig.json
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\common\FileDropInput.vue
+           #2429  4:04 AM  🔵  FileDropInput type error in openFileDialog function
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\bridge.ts
+           #2430           🔵  Investigating call function signature for type compatibility
+           #2431           🔵  call function accepts unknown[] parameters
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\common\FileDropInput.vue
+           #2432           🔴  Fixed type error in FileDropInput openFileDialog
+         ..\..\Git\GithubManager\ff-intelligent-neo\main.py
+           #2433  4:05 AM  🔵  select_file_filtered handles file_types parameter correctly
+           #2434           🔴  Fixed select_file_filtered type annotation to match actual parameter type
+           #2435           🔵  select_files method has inconsistent type annotation
+           #2436           🔴  Fixed select_files type annotation for consistency
+         General
+           #2437  4:07 AM  🔵  Build still fails with TypeScript errors
+           #2438           🔵  Confirmed directory structure for import path calculation
+           #2439  4:08 AM  🔵  Created frontend/src/config directory
+           #2440           🟣  Created frontend-local file_formats.json configuration
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\composables\useFileFormats.ts
+           #2441           🔴  Fixed file_formats.json import path
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\common\FileDropInput.vue
+           #2442           🔵  FileDropInput still has TypeScript type error
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\config\file_formats.json
+           #2443  4:12 AM  🔵  TypeScript build errors blocking file type filtering feature
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\composables\useFileFormats.ts
+           #2444           🔴  Fixed toWebViewFileTypes parameter type to accept undefined
+         General
+           #2445  4:13 AM  🟣  Frontend build succeeded with unified file type filtering
+         ..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\composables\useFileFormats.ts
+           #2446           🟣  Implemented unified file type filtering across entire application
+         ..\..\Git\GithubManager\ff-intelligent-neo\main.py
+           #2447  4:14 AM  🔵  Backend preset loading mechanism not found in main.py
+           #2448           🔵  Backend preset system uses PresetManager from core.preset_manager
+         ..\..\Git\GithubManager\ff-intelligent-neo\core\preset_manager.py
+           #2449           🔵  PresetManager loads default presets from presets/default_presets.json
+         ..\..\Git\GithubManager\ff-intelligent-neo\main.py
+           #2450           🔵  get_presets API method located at line 572 in main.py
+         frontend/src/config/file_formats.json
+           #2451  4:16 AM  ✅  Removed duplicate file_formats.json from frontend config directory
+         ..\..\Git\GithubManager\ff-intelligent-neo\core\preset_manager.py
+           #2452           🔵  Confirmed _get_default_presets_dir function location and usage in PresetManager
+           #2453  4:17 AM  🔵  Default presets directory resolution supports dev and PyInstaller environments
+         ..\..\Git\GithubManager\ff-intelligent-neo\main.py
+           #2454           🔵  Backend preset API endpoints use @expose decorator with consistent error handling pattern
+           #2455           🔵  json module not currently imported in main.py
+           #2456           🔵  main.py imports include Path, webview, and core modules
+           #2457           ✅  Added json module import to main.py
+           #2458           🟣  Implemented get_file_formats API endpoint in backend
+         ..\..\Git\GithubManager\ff-intelligent-neo\core\preset_manager.py
+           #2459  4:18 AM  🔵  PresetManager does not store _default_presets_dir as instance attribute
+         ..\..\Git\GithubManager\ff-intelligent-neo\main.py
+           #2460           🔴  Fixed get_file_formats to directly call _get_default_presets_dir function
+         frontend/src/composables/useFileFormats.ts
+           #2461  4:19 AM  🟣  Implemented frontend composable useFileFormats with backend API integration
+         General
+           #2462           🔵  Frontend build completed successfully after file format refactoring
+

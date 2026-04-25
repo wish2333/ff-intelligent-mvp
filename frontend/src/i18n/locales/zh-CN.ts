@@ -91,6 +91,11 @@ export default {
       stopAll: "全部停止",
     },
 
+    preset: {
+      label: "预设：",
+      selectPreset: "-- 选择预设 --",
+    },
+
     table: {
       file: "文件",
       state: "状态",

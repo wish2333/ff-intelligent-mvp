@@ -12,6 +12,9 @@ import { computed, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import type { FilterConfigDTO } from "../../types/config"
 import FileDropInput from "../common/FileDropInput.vue"
+import { useFileFormats } from "../../composables/useFileFormats"
+
+const { fileFormats } = useFileFormats()
 
 const { t } = useI18n()
 
@@ -157,7 +160,7 @@ const bgInfoText = computed(() => {
             </label>
             <FileDropInput
               :model-value="config.bg_image_path"
-              accept=".png,.jpg,.jpeg,.bmp,.webp"
+              :accept="fileFormats.image"
               :placeholder="t('config.filters.bgPlaceholder')"
               :fullscreen-drop="fullscreenDropTarget === 'bg_image'"
               @update:model-value="config.bg_image_path = $event"
@@ -231,7 +234,7 @@ const bgInfoText = computed(() => {
               </label>
               <FileDropInput
                 :model-value="config.watermark_path"
-                accept=".png,.jpg,.jpeg,.bmp,.webp"
+                :accept="fileFormats.image"
                 :placeholder="t('config.filters.watermark.placeholder')"
                 :fullscreen-drop="fullscreenDropTarget === 'watermark'"
                 @update:model-value="config.watermark_path = $event"

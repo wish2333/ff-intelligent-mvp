@@ -13,10 +13,12 @@ import { useTaskControl } from "../composables/useTaskControl"
 import { useTaskProgress } from "../composables/useTaskProgress"
 import { useFileDrop } from "../composables/useFileDrop"
 import { useGlobalConfig } from "../composables/useGlobalConfig"
+import type { PresetDTO } from "../types/preset"
 
 import TaskToolbar from "../components/task-queue/TaskToolbar.vue"
 import QueueSummary from "../components/task-queue/QueueSummary.vue"
 import BatchControlBar from "../components/task-queue/BatchControlBar.vue"
+import QueuePresetSelect from "../components/task-queue/QueuePresetSelect.vue"
 import TaskList from "../components/task-queue/TaskList.vue"
 import TaskLogPanel from "../components/task-queue/TaskLogPanel.vue"
 
@@ -76,6 +78,10 @@ async function handleDrop(): Promise<void> {
 
 function currentConfig() {
   return globalConfig.toTaskConfig()
+}
+
+function handlePresetApply(preset: PresetDTO) {
+  globalConfig.loadFromTaskConfig(preset.config)
 }
 
 async function handleStartAllPending(): Promise<void> {
@@ -145,17 +151,20 @@ async function handleMoveDown(taskId: string): Promise<void> {
       </div>
     </div>
 
-    <!-- Toolbar -->
-    <TaskToolbar
-      :selected-count="queue.selectedIds.value.size"
-      :total-count="queue.tasks.value.length"
-      :is-all-selected="queue.isAllSelected.value"
-      @add-files="handleAddFiles"
-      @remove-selected="queue.removeTasks([...queue.selectedIds.value])"
-      @clear-completed="queue.clearCompleted()"
-      @clear-all="queue.clearAll()"
-      @toggle-select-all="queue.toggleSelectAll()"
-    />
+    <!-- Toolbar + Preset -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <TaskToolbar
+        :selected-count="queue.selectedIds.value.size"
+        :total-count="queue.tasks.value.length"
+        :is-all-selected="queue.isAllSelected.value"
+        @add-files="handleAddFiles"
+        @remove-selected="queue.removeTasks([...queue.selectedIds.value])"
+        @clear-completed="queue.clearCompleted()"
+        @clear-all="queue.clearAll()"
+        @toggle-select-all="queue.toggleSelectAll()"
+      />
+      <QueuePresetSelect @apply="handlePresetApply" />
+    </div>
 
     <!-- Summary + Batch controls -->
     <div class="flex flex-wrap items-center justify-between gap-3">

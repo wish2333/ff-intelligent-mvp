@@ -11,6 +11,9 @@ import { useI18n } from "vue-i18n"
 import { call } from "../../bridge"
 import type { MergeConfigDTO } from "../../types/config"
 import SplitDropZone from "../common/SplitDropZone.vue"
+import { useFileFormats } from "../../composables/useFileFormats"
+
+const { fileFormats } = useFileFormats()
 
 const { t } = useI18n()
 
@@ -80,8 +83,8 @@ async function handleClickOutro() {
       <SplitDropZone
         :left-label="t('config.mergeSettings.introVideo')"
         :right-label="t('config.mergeSettings.outroVideo')"
-        left-accept=".mp4,.mkv,.avi,.mov,.ts,.m2ts"
-        right-accept=".mp4,.mkv,.avi,.mov,.ts,.m2ts"
+        :left-accept="fileFormats.video"
+        :right-accept="fileFormats.video"
         @drop-left="handleDropIntro"
         @drop-right="handleDropOutro"
       >

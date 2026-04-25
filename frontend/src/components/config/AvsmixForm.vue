@@ -8,6 +8,9 @@
 
 import { useI18n } from "vue-i18n"
 import type { AudioSubtitleConfigDTO } from "../../types/config"
+import { useFileFormats } from "../../composables/useFileFormats"
+
+const { fileFormats } = useFileFormats()
 import FileDropInput from "../common/FileDropInput.vue"
 
 const { t } = useI18n()
@@ -34,7 +37,7 @@ defineProps<{
           </label>
           <FileDropInput
             :model-value="config.external_audio_path"
-            accept=".mp3,.aac,.flac,.wav,.m4a,.ogg,.wma"
+            :accept="fileFormats.audio"
             :placeholder="t('avMix.audio.dropHint')"
             fullscreen-drop
             @update:model-value="config.external_audio_path = $event"
@@ -73,7 +76,7 @@ defineProps<{
           </label>
           <FileDropInput
             :model-value="config.subtitle_path"
-            accept=".srt,.ass,.ssa"
+            :accept="fileFormats.subtitle"
             :placeholder="t('avMix.subtitle.dropHint')"
             fullscreen-drop
             @update:model-value="config.subtitle_path = $event"

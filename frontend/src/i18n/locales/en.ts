@@ -91,6 +91,11 @@ export default {
       stopAll: "Stop All",
     },
 
+    preset: {
+      label: "Preset:",
+      selectPreset: "-- Select Preset --",
+    },
+
     table: {
       file: "File",
       state: "State",
