@@ -277,8 +277,8 @@ _register_transcode_param(
         [{"level": "error", "message": f"Invalid quality mode: {val} (expected crf, cq, or qp)"}]
         if val and val not in VALID_QUALITY_MODES
         else (
-            [{"level": "warning", "message": f"Quality value out of range (0-51): {tc.quality_value}"}]
-            if val and (tc.quality_value < 0 or tc.quality_value > 51)
+            [{"level": "warning", "message": f"Quality value out of range (0-{51 if val != 'q' else 100}): {tc.quality_value}"}]
+            if val and (tc.quality_value < 0 or tc.quality_value > (51 if val != 'q' else 100))
             else []
         )
     ),
