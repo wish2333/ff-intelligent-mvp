@@ -48,6 +48,7 @@ VALID_VIDEO_CODECS = {
     "libx264", "libx265", "libsvtav1", "libvpx-vp9",
     "av1_nvenc", "hevc_nvenc", "h264_nvenc",
     "h264_amf", "hevc_amf", "h264_qsv", "hevc_qsv",
+    "h264_videotoolbox", "hevc_videotoolbox",
     "copy", "none",
 }
 VALID_AUDIO_CODECS = {"aac", "opus", "flac", "libmp3lame", "alac", "copy", "none"}
@@ -57,7 +58,7 @@ VALID_OUTPUT_EXTENSIONS = {
 VALID_ROTATE_OPTIONS = {"", "none", "transpose=1", "transpose=2", "transpose=3"}
 VALID_WATERMARK_POSITIONS = {"", "top-left", "top-right", "bottom-left", "bottom-right"}
 VALID_PRESETS = {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"}
-VALID_QUALITY_MODES = {"crf", "cq", "qp"}
+VALID_QUALITY_MODES = {"crf", "cq", "qp", "q"}
 VALID_PIXEL_FORMATS = {"yuv420p", "yuv420p10le", "yuv422p", "yuv444p"}
 
 # ---------------------------------------------------------------------------
@@ -260,12 +261,14 @@ _register_transcode_param(
     ),
 )
 
-# Phase 3.5: quality_mode -> -crf / -cq / -qp
+# Phase 3.5: quality_mode -> -crf / -cq / -qp / -q:v
+_QUALITY_FLAG_MAP = {"crf": "-crf", "cq": "-cq", "qp": "-qp", "q": "-q:v"}
+
 _register_transcode_param(
     "quality_mode",
     build=lambda val, tc, ctx: (
         [
-            f"-{val}", str(tc.quality_value),
+            _QUALITY_FLAG_MAP.get(val, f"-{val}"), str(tc.quality_value),
         ]
         if val and tc.quality_value > 0 and tc.video_codec not in ("copy", "none")
         else []

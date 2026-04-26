@@ -21,6 +21,7 @@ const { t } = useI18n()
 
 const props = defineProps<{
   config: TranscodeConfigDTO
+  platform?: string
 }>()
 
 const { supportedEncoders } = useGlobalConfig()
@@ -33,6 +34,7 @@ const QUALITY_MODE_SUGGESTIONS = computed(() => [
   { value: "crf", label: t("config.transcode.qualityModes.crf") },
   { value: "cq", label: t("config.transcode.qualityModes.cq") },
   { value: "qp", label: t("config.transcode.qualityModes.qp") },
+  { value: "q", label: t("config.transcode.qualityModes.q") },
 ])
 
 const PRESET_SUGGESTIONS = [
@@ -134,12 +136,13 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             :model-value="config.video_codec"
             category="video"
             :supported-encoders="supportedEncoders"
+            :platform="platform"
             @update:model-value="config.video_codec = $event"
             @quality-change="handleQualityChange"
           />
         </div>
 
-        <div v-if="isVideoReencode()" class="form-control">
+        <div v-show="isVideoReencode()" class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.resolution") }}</span>
           </label>
@@ -149,9 +152,10 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             @change="(e) => {
               const v = (e.target as HTMLSelectElement).value
               if (v && v !== '__custom__') props.config.resolution = v
+              else props.config.resolution = ''
             }"
           >
-            <option value="" disabled>{{ t("config.transcode.placeholders.resolutionPreset") }}</option>
+            <option value="">{{ t("config.transcode.placeholders.resolutionPreset") }}</option>
             <option v-for="rp in RESOLUTION_PRESETS" :key="rp.value" :value="rp.value">
               {{ rp.label }} ({{ rp.value }})
             </option>
@@ -186,27 +190,37 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             :model-value="config.audio_codec"
             category="audio"
             :supported-encoders="supportedEncoders"
+            :platform="platform"
             @update:model-value="config.audio_codec = $event"
           />
         </div>
 
         <!-- Row 2: QM | Framerate | AB -->
-        <div v-if="isVideoReencode()" class="form-control">
+        <div v-show="isVideoReencode()" class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.qualityMode") }}</span>
           </label>
           <select
-            v-model="config.quality_mode"
+            :value="config.quality_mode"
             class="select select-bordered select-sm w-full"
+            @change="(e) => {
+              const v = (e.target as HTMLSelectElement).value
+              if (v) {
+                config.quality_mode = v
+              } else {
+                config.quality_mode = ''
+                config.quality_value = 0
+              }
+            }"
           >
-            <option value="" disabled>{{ t("config.transcode.selectQualityMode") }}</option>
+            <option value="">{{ t("config.transcode.selectQualityMode") }}</option>
             <option v-for="q in QUALITY_MODE_SUGGESTIONS" :key="q.value" :value="q.value">
               {{ q.label }}
             </option>
           </select>
         </div>
 
-        <div v-if="isVideoReencode()" class="form-control">
+        <div v-show="isVideoReencode()" class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.framerate") }}</span>
           </label>
@@ -218,7 +232,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
           />
         </div>
 
-        <div v-if="config.audio_codec !== 'copy' && config.audio_codec !== 'none'" class="form-control">
+        <div v-show="config.audio_codec !== 'copy' && config.audio_codec !== 'none'" class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.audioBitrate") }}</span>
           </label>
@@ -231,7 +245,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
         </div>
 
         <!-- Row 3: QV | VB | OutputFormat -->
-        <div v-if="isVideoReencode() && config.quality_mode" class="form-control">
+        <div v-show="isVideoReencode()" class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.qualityValue") }}</span>
           </label>
@@ -245,7 +259,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
           />
         </div>
 
-        <div v-if="isVideoReencode()" class="form-control">
+        <div v-show="isVideoReencode()" class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.videoBitrate") }}</span>
           </label>
@@ -270,7 +284,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
         </div>
 
         <!-- Row 4: EP | MB -->
-        <div v-if="isVideoReencode()" class="form-control">
+        <div v-show="isVideoReencode()" class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.encodingPreset") }}</span>
           </label>
@@ -282,7 +296,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
           />
         </div>
 
-        <div v-if="isVideoReencode()" class="form-control">
+        <div v-show="isVideoReencode()" class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.maxBitrate") }}</span>
           </label>
@@ -296,7 +310,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
         <div class="invisible" aria-hidden="true"></div>
 
         <!-- Row 5: PF -->
-        <div v-if="isVideoReencode()" class="form-control">
+        <div v-show="isVideoReencode()" class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.pixelFormat") }}</span>
           </label>

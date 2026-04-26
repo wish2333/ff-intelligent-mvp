@@ -15,6 +15,7 @@ import { useI18n } from "vue-i18n"
 import { call } from "../bridge"
 import { useGlobalConfig } from "../composables/useGlobalConfig"
 import { useCommandPreview } from "../composables/useCommandPreview"
+import { useSettings } from "../composables/useSettings"
 import type { PresetDTO } from "../types/preset"
 import type { ActiveMode } from "../types/config"
 
@@ -33,6 +34,8 @@ const {
   activeMode, supportedEncoders,
   toTaskConfig, loadFromTaskConfig, resetAll,
 } = useGlobalConfig()
+
+const { appInfo, fetchAppInfo } = useSettings()
 
 const configRef = computed(() => toTaskConfig())
 const { commandText, errors, warnings, validating } = useCommandPreview(configRef)
@@ -82,6 +85,7 @@ function handleReset() {
 // Hardware encoder detection on mount
 onMounted(async () => {
   activeMode.value = "transcode"
+  await fetchAppInfo()
   try {
     const res = await call<string[]>("check_hw_encoders")
     if (res.success && res.data) {
@@ -129,6 +133,7 @@ onMounted(async () => {
     <TranscodeForm
       v-if="activeMode === 'transcode'"
       :config="transcode"
+      :platform="appInfo?.platform ?? ''"
     />
     <FilterForm
       v-if="activeMode === 'filters'"

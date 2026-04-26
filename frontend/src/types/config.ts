@@ -80,9 +80,9 @@ export interface EncoderConfigDTO {
   name: string
   displayName: string
   category: "video" | "audio"
-  hardwareType?: "cpu" | "nvidia" | "amd" | "intel"
+  hardwareType?: "cpu" | "nvidia" | "amd" | "intel" | "apple"
   recommendedQuality?: number
-  qualityMode?: "crf" | "cq" | "qp"
+  qualityMode?: "crf" | "cq" | "qp" | "q"
   description: string
   priority: "P0" | "P1" | "P2"
 }

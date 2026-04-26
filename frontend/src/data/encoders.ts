@@ -28,6 +28,10 @@ export const VIDEO_ENCODERS: EncoderConfigDTO[] = [
   // Special
   { name: "copy", displayName: "Copy (no re-encode)", category: "video", description: "Copy video stream without re-encoding", priority: "P1" },
   { name: "none", displayName: "No Video", category: "video", description: "Remove video stream", priority: "P1" },
+
+  // Apple (macOS only)
+  { name: "h264_videotoolbox", displayName: "H.264 (Apple)", category: "video", hardwareType: "apple", recommendedQuality: 65, qualityMode: "q", description: "macOS hardware encoding via VideoToolbox", priority: "P1" },
+  { name: "hevc_videotoolbox", displayName: "HEVC (Apple)", category: "video", hardwareType: "apple", recommendedQuality: 65, qualityMode: "q", description: "macOS H.265 hardware encoding via VideoToolbox", priority: "P1" },
 ]
 
 export const AUDIO_ENCODERS: EncoderConfigDTO[] = [

@@ -26,6 +26,7 @@ const props = defineProps<{
   modelValue: string
   category: "video" | "audio"
   supportedEncoders?: string[]
+  platform?: string
 }>()
 
 const emit = defineEmits<{
@@ -37,9 +38,22 @@ const customName = ref("")
 
 const isCustomMode = computed(() => props.modelValue && !isPresetEncoder(props.modelValue))
 
-const encoders = computed<EncoderConfigDTO[]>(() =>
-  props.category === "video" ? VIDEO_ENCODERS : AUDIO_ENCODERS,
-)
+const platformFilteredEncoders = computed<EncoderConfigDTO[]>(() => {
+  const list = props.category === "video" ? VIDEO_ENCODERS : AUDIO_ENCODERS
+  if (!props.platform) return list
+  if (props.platform === "darwin") {
+    // macOS: hide non-Apple hardware encoders and AV1 encoders
+    return list.filter((e: EncoderConfigDTO) => {
+      if (e.hardwareType === "nvidia" || e.hardwareType === "amd" || e.hardwareType === "intel") return false
+      if (e.name === "av1_nvenc" || e.name === "libsvtav1") return false
+      return true
+    })
+  }
+  // Non-macOS: hide Apple encoders
+  return list.filter((e: EncoderConfigDTO) => e.hardwareType !== "apple")
+})
+
+const encoders = computed<EncoderConfigDTO[]>(() => platformFilteredEncoders.value)
 
 const groups = computed(() => {
   const list = encoders.value
@@ -59,7 +73,7 @@ const groups = computed(() => {
 })
 
 function isPresetEncoder(name: string): boolean {
-  return encoders.value.some((e: EncoderConfigDTO) => e.name === name)
+  return platformFilteredEncoders.value.some((e: EncoderConfigDTO) => e.name === name)
 }
 
 function isSupported(encoder: EncoderConfigDTO): boolean {
@@ -120,7 +134,6 @@ function handleCustomInput(value: string) {
 
     <!-- Custom encoder text input -->
     <input
-      v-if="modelValue === '' || isCustomMode"
       v-model="customName"
       type="text"
       :placeholder="t('config.encoder.customPlaceholder')"
