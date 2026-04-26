@@ -154,6 +154,7 @@ export default {
         crf: "CRF (Constant Rate Factor)",
         cq: "CQ (Constant Quality)",
         qp: "QP (Constant Quantization)",
+        q: "Q (Quality)",
       },
       placeholders: {
         resolutionW: "1920",

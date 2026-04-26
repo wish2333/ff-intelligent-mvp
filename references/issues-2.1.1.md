@@ -655,3 +655,28 @@ fix(encode): 修复编码选项异常与预设配置
          General
            #2462           🔵  Frontend build completed successfully after file format refactoring
 
+### 📝 Commit Message
+
+```
+refactor(config): 提取文件格式配置并修复状态标签换行
+
+- 将各组件硬编码的文件格式校验提取至 presets/file_formats.json
+- 新增 useFileFormats composable，通过后端 API 加载并缓存配置
+- 系统文件对话框现在同步按格式预过滤
+- 修复队列页状态标签三个汉字换行显示的问题
+```
+
+### 🚀 Release Notes
+
+```
+## 2026-04-26 - 文件格式配置集中化与界面修复
+
+### ✨ 新增
+- 支持的文件格式现在统一配置在 presets/file_formats.json 中，修改后重启应用即可生效，无需再翻找代码
+
+### 🐛 修复
+- 修复任务队列页状态标签文字换行的问题，确保状态名称完整显示在一行内
+
+### ⚡ 优化
+- 点击选择文件时，系统文件对话框会自动按对应格式过滤，与拖拽导入的行为保持一致
+```

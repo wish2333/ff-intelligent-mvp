@@ -154,6 +154,7 @@ export default {
         crf: "CRF（恒定速率因子）",
         cq: "CQ（恒定质量）",
         qp: "QP（恒定量化）",
+        q: "Q（质量）",
       },
       placeholders: {
         resolutionW: "1920",

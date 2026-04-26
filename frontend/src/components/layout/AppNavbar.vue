@@ -69,11 +69,8 @@ onUnmounted(() => {
 
 <template>
   <div class="navbar bg-base-200 border-b border-base-300 px-4 shrink-0">
-    <div class="navbar-start">
-      <span class="text-base font-bold tracking-tight">FF Neo</span>
-    </div>
-
-    <div class="navbar-center flex gap-0.5">
+    <div class="navbar-start flex items-center gap-1">
+      <span class="text-base font-bold tracking-tight mr-2">FF Neo</span>
       <router-link
         v-for="item in navItems"
         :key="item.name"
