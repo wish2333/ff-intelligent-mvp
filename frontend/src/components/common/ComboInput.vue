@@ -12,8 +12,10 @@ const props = withDefaults(defineProps<{
   modelValue: string
   suggestions: string[]
   placeholder?: string
+  disabled?: boolean
 }>(), {
   placeholder: "",
+  disabled: false,
 })
 
 const emit = defineEmits<{
@@ -78,6 +80,7 @@ onBeforeUnmount(() => {
       :placeholder="placeholder"
       type="text"
       class="input input-bordered input-sm w-full pr-7"
+      :disabled="disabled"
       @focus="onInputFocus"
       @input="onInput"
       @keydown.escape="isOpen = false"
@@ -87,6 +90,7 @@ onBeforeUnmount(() => {
       type="button"
       class="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-base-content/50 hover:text-base-content/80"
       tabindex="-1"
+      :disabled="disabled"
       @click.prevent="toggleDropdown"
     >
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

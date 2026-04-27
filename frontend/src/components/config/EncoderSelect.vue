@@ -53,7 +53,14 @@ const platformFilteredEncoders = computed<EncoderConfigDTO[]>(() => {
   return list.filter((e: EncoderConfigDTO) => e.hardwareType !== "apple")
 })
 
-const encoders = computed<EncoderConfigDTO[]>(() => platformFilteredEncoders.value)
+const encoders = computed<EncoderConfigDTO[]>(() => {
+  const list = platformFilteredEncoders.value
+  if (!props.supportedEncoders?.length) return list
+  return list.filter((e: EncoderConfigDTO) => {
+    if (!e.hardwareType) return true // copy, none, cpu encoders always show
+    return props.supportedEncoders!.includes(e.name)
+  })
+})
 
 const groups = computed(() => {
   const list = encoders.value
@@ -73,7 +80,7 @@ const groups = computed(() => {
 })
 
 function isPresetEncoder(name: string): boolean {
-  return platformFilteredEncoders.value.some((e: EncoderConfigDTO) => e.name === name)
+  return encoders.value.some((e: EncoderConfigDTO) => e.name === name)
 }
 
 function isSupported(encoder: EncoderConfigDTO): boolean {
@@ -119,15 +126,15 @@ function handleCustomInput(value: string) {
         :key="group.priority"
         :label="group.label"
       >
-        <option
-          v-for="enc in group.encoders"
-          :key="enc.name"
-          :value="enc.name"
-          :disabled="!isSupported(enc)"
-          :title="!isSupported(enc) ? t('config.encoder.hwNotDetected') : `${enc.description} (recommended: ${enc.recommendedQuality ?? 'auto'})`"
-        >
-          {{ enc.displayName }} ({{ enc.name }})
-        </option>
+        <template v-for="enc in group.encoders" :key="enc.name">
+          <option
+            v-if="isSupported(enc)"
+            :value="enc.name"
+            :title="`${enc.description} (recommended: ${enc.recommendedQuality ?? 'auto'})`"
+          >
+            {{ enc.displayName }} ({{ enc.name }})
+          </option>
+        </template>
       </optgroup>
       <option :value="OTHER_KEY">{{ t("config.encoder.other") }}</option>
     </select>

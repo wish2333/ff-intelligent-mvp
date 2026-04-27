@@ -2,3 +2,14 @@
 @plugin "daisyui" {
   themes: dark --default, light;
 }
+
+/* Reserve scrollbar space to prevent layout shift on all pages */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Apply to page-level scroll containers that create their own scrolling context */
+.overflow-y-auto,
+.overflow-auto {
+  scrollbar-gutter: stable;
+}
