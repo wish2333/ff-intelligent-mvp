@@ -434,7 +434,11 @@ class AutoEditorApi:
                 auto_editor_path=auto_editor_path,
             )
 
-            display = " ".join(argv)
+            # Replace full binary path with "auto-editor" in display for cleaner preview
+            if argv:
+                display = "auto-editor " + " ".join(argv[1:])
+            else:
+                display = ""
 
             return {
                 "success": True,

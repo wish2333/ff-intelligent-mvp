@@ -142,13 +142,14 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
           />
         </div>
 
-        <div v-show="isVideoReencode()" class="form-control">
+        <div class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.resolution") }}</span>
           </label>
           <select
             :value="config.resolution ? '__custom__' : ''"
             class="select select-bordered select-sm w-full mb-1"
+            :disabled="!isVideoReencode()"
             @change="(e) => {
               const v = (e.target as HTMLSelectElement).value
               if (v && v !== '__custom__') props.config.resolution = v
@@ -169,6 +170,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
               type="number"
               :placeholder="t('config.transcode.placeholders.resolutionW')"
               class="input input-bordered input-sm flex-1"
+              :disabled="!isVideoReencode()"
               min="1"
             />
             <span class="text-xs text-base-content/50">x</span>
@@ -177,6 +179,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
               type="number"
               :placeholder="t('config.transcode.placeholders.resolutionH')"
               class="input input-bordered input-sm flex-1"
+              :disabled="!isVideoReencode()"
               min="1"
             />
           </div>
@@ -196,13 +199,14 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
         </div>
 
         <!-- Row 2: QM | Framerate | AB -->
-        <div v-show="isVideoReencode()" class="form-control">
+        <div class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.qualityMode") }}</span>
           </label>
           <select
             :value="config.quality_mode"
             class="select select-bordered select-sm w-full"
+            :disabled="!isVideoReencode()"
             @change="(e) => {
               const v = (e.target as HTMLSelectElement).value
               if (v) {
@@ -220,7 +224,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
           </select>
         </div>
 
-        <div v-show="isVideoReencode()" class="form-control">
+        <div class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.framerate") }}</span>
           </label>
@@ -229,10 +233,11 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             type="text"
             :placeholder="t('config.transcode.placeholders.framerate')"
             class="input input-bordered input-sm w-full"
+            :disabled="!isVideoReencode()"
           />
         </div>
 
-        <div v-show="config.audio_codec !== 'copy' && config.audio_codec !== 'none'" class="form-control">
+        <div class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.audioBitrate") }}</span>
           </label>
@@ -241,11 +246,12 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             type="text"
             :placeholder="t('config.transcode.placeholders.audioBitrate')"
             class="input input-bordered input-sm w-full"
+            :disabled="config.audio_codec === 'copy' || config.audio_codec === 'none'"
           />
         </div>
 
         <!-- Row 3: QV | VB | OutputFormat -->
-        <div v-show="isVideoReencode()" class="form-control">
+        <div class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.qualityValue") }}</span>
           </label>
@@ -256,10 +262,11 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             max="51"
             :placeholder="t('config.transcode.placeholders.qualityValue')"
             class="input input-bordered input-sm w-full"
+            :disabled="!isVideoReencode()"
           />
         </div>
 
-        <div v-show="isVideoReencode()" class="form-control">
+        <div class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.videoBitrate") }}</span>
           </label>
@@ -268,6 +275,7 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             type="text"
             :placeholder="t('config.transcode.placeholders.videoBitrate')"
             class="input input-bordered input-sm w-full"
+            :disabled="!isVideoReencode()"
           />
         </div>
 
@@ -283,8 +291,8 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
           />
         </div>
 
-        <!-- Row 4: EP | MB -->
-        <div v-show="isVideoReencode()" class="form-control">
+        <!-- Row 4: EP | MB | Bufsize -->
+        <div class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.encodingPreset") }}</span>
           </label>
@@ -293,10 +301,11 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             :suggestions="PRESET_SUGGESTIONS"
             :placeholder="t('config.transcode.placeholders.encodingPreset')"
             @update:model-value="config.preset = $event"
+            :disabled="!isVideoReencode()"
           />
         </div>
 
-        <div v-show="isVideoReencode()" class="form-control">
+        <div class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.maxBitrate") }}</span>
           </label>
@@ -305,12 +314,25 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             type="text"
             :placeholder="t('config.transcode.placeholders.maxBitrate')"
             class="input input-bordered input-sm w-full"
+            :disabled="!isVideoReencode()"
           />
         </div>
-        <div class="invisible" aria-hidden="true"></div>
+
+        <div class="form-control">
+          <label class="label py-1">
+            <span class="label-text text-xs">{{ t("config.transcode.bufferSize") }}</span>
+          </label>
+          <input
+            v-model="config.bufsize"
+            type="text"
+            :placeholder="t('config.transcode.placeholders.bufferSize')"
+            class="input input-bordered input-sm w-full"
+            :disabled="!isVideoReencode()"
+          />
+        </div>
 
         <!-- Row 5: PF -->
-        <div v-show="isVideoReencode()" class="form-control">
+        <div class="form-control">
           <label class="label py-1">
             <span class="label-text text-xs">{{ t("config.transcode.pixelFormat") }}</span>
           </label>
@@ -319,23 +341,11 @@ function handleQualityChange(payload: { quality: number; mode: string } | null) 
             :suggestions="PIXEL_FORMAT_SUGGESTIONS"
             :placeholder="t('config.transcode.placeholders.pixelFormat')"
             @update:model-value="config.pixel_format = $event"
+            :disabled="!isVideoReencode()"
           />
         </div>
         <div class="invisible" aria-hidden="true"></div>
         <div class="invisible" aria-hidden="true"></div>
-
-        <!-- Buffer Size (full width, conditional) -->
-        <div v-if="isVideoReencode() && config.max_bitrate" class="form-control col-span-3">
-          <label class="label py-1">
-            <span class="label-text text-xs">{{ t("config.transcode.bufferSize") }}</span>
-          </label>
-          <input
-            v-model="config.bufsize"
-            type="text"
-            :placeholder="t('config.transcode.placeholders.bufferSize')"
-            class="input input-bordered input-sm w-full max-w-xs"
-          />
-        </div>
       </div>
     </div>
   </div>

@@ -147,25 +147,21 @@ const smoothMinclip = computed({
 
 <template>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <!-- Edit method -->
-    <div class="form-control">
+    <!-- Edit method + Threshold (grouped together) -->
+    <div class="form-control md:col-span-2">
       <label class="label">
         <span class="label-text">{{ t("autoCut.editMethod") }}</span>
       </label>
       <select
         :value="editMethod"
-        class="select select-bordered select-sm w-full"
+        class="select select-bordered select-sm w-full mb-2"
         @change="emit('update:editMethod', ($event.target as HTMLSelectElement).value as 'audio' | 'motion')"
       >
         <option value="audio">{{ t("autoCut.audio") }}</option>
         <option value="motion">{{ t("autoCut.motion") }}</option>
       </select>
-    </div>
-
-    <!-- Threshold -->
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text">{{ t("autoCut.threshold") }}</span>
+      <label class="label pb-0">
+        <span class="label-text text-xs">{{ t("autoCut.threshold") }} ({{ editMethod === 'audio' ? t('autoCut.audio') : t('autoCut.motion') }})</span>
         <span class="label-text-alt">{{ thresholdDisplay }}</span>
       </label>
       <input

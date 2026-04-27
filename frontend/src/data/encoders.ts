@@ -8,6 +8,10 @@
 import type { EncoderConfigDTO } from "../types/config"
 
 export const VIDEO_ENCODERS: EncoderConfigDTO[] = [
+  // Special (shown first)
+  { name: "copy", displayName: "Copy (no re-encode)", category: "video", description: "Copy video stream without re-encoding", priority: "P0" },
+  { name: "none", displayName: "No Video", category: "video", description: "Remove video stream", priority: "P0" },
+
   // P0: First choice recommendations
   { name: "av1_nvenc", displayName: "AV1 (NVIDIA)", category: "video", hardwareType: "nvidia", recommendedQuality: 36, qualityMode: "cq", description: "RTX 40+ recommended, best compression efficiency", priority: "P0" },
   { name: "libx265", displayName: "H.265/HEVC", category: "video", hardwareType: "cpu", recommendedQuality: 24, qualityMode: "crf", description: "Best quality/size balance, widely supported", priority: "P0" },
@@ -17,6 +21,7 @@ export const VIDEO_ENCODERS: EncoderConfigDTO[] = [
   { name: "libx264", displayName: "H.264/AVC", category: "video", hardwareType: "cpu", recommendedQuality: 23, qualityMode: "crf", description: "Best compatibility, widely decoded", priority: "P1" },
   { name: "hevc_nvenc", displayName: "HEVC (NVIDIA)", category: "video", hardwareType: "nvidia", recommendedQuality: 28, qualityMode: "cq", description: "Fast H.265 encoding on NVIDIA GPUs", priority: "P1" },
   { name: "h264_nvenc", displayName: "H.264 (NVIDIA)", category: "video", hardwareType: "nvidia", recommendedQuality: 28, qualityMode: "cq", description: "Fast H.264 encoding on NVIDIA GPUs", priority: "P1" },
+  { name: "av1_qsv", displayName: "AV1 (Intel QSV)", category: "video", hardwareType: "intel", recommendedQuality: 32, qualityMode: "qp", description: "Intel Arc/Quick Sync AV1 hardware encoding", priority: "P1" },
   { name: "libvpx-vp9", displayName: "VP9", category: "video", hardwareType: "cpu", recommendedQuality: 31, qualityMode: "crf", description: "Web-friendly format", priority: "P1" },
 
   // P2: Conditional (requires specific hardware)
@@ -25,23 +30,21 @@ export const VIDEO_ENCODERS: EncoderConfigDTO[] = [
   { name: "h264_qsv", displayName: "H.264 (Intel)", category: "video", hardwareType: "intel", recommendedQuality: 28, qualityMode: "qp", description: "Intel Quick Sync Video encoding", priority: "P2" },
   { name: "hevc_qsv", displayName: "HEVC (Intel)", category: "video", hardwareType: "intel", recommendedQuality: 30, qualityMode: "qp", description: "Intel Quick Sync H.265 encoding", priority: "P2" },
 
-  // Special
-  { name: "copy", displayName: "Copy (no re-encode)", category: "video", description: "Copy video stream without re-encoding", priority: "P1" },
-  { name: "none", displayName: "No Video", category: "video", description: "Remove video stream", priority: "P1" },
-
   // Apple (macOS only)
   { name: "h264_videotoolbox", displayName: "H.264 (Apple)", category: "video", hardwareType: "apple", recommendedQuality: 65, qualityMode: "q", description: "macOS hardware encoding via VideoToolbox", priority: "P1" },
   { name: "hevc_videotoolbox", displayName: "HEVC (Apple)", category: "video", hardwareType: "apple", recommendedQuality: 65, qualityMode: "q", description: "macOS H.265 hardware encoding via VideoToolbox", priority: "P1" },
 ]
 
 export const AUDIO_ENCODERS: EncoderConfigDTO[] = [
+  // Special (shown first)
+  { name: "copy", displayName: "Copy (no re-encode)", category: "audio", description: "Copy audio stream without re-encoding", priority: "P0" },
+  { name: "none", displayName: "No Audio", category: "audio", description: "Remove audio stream", priority: "P0" },
+
   { name: "aac", displayName: "AAC", category: "audio", hardwareType: "cpu", recommendedQuality: undefined, description: "Universal audio codec, 192k recommended", priority: "P0" },
   { name: "opus", displayName: "Opus", category: "audio", hardwareType: "cpu", recommendedQuality: undefined, description: "Open source, best quality at 128k", priority: "P0" },
   { name: "flac", displayName: "FLAC", category: "audio", hardwareType: "cpu", recommendedQuality: undefined, description: "Lossless audio compression", priority: "P1" },
   { name: "libmp3lame", displayName: "MP3", category: "audio", hardwareType: "cpu", recommendedQuality: undefined, description: "Universal MP3 format, 320k recommended", priority: "P1" },
   { name: "alac", displayName: "ALAC", category: "audio", hardwareType: "cpu", recommendedQuality: undefined, description: "Apple Lossless Audio Codec", priority: "P2" },
-  { name: "copy", displayName: "Copy (no re-encode)", category: "audio", description: "Copy audio stream without re-encoding", priority: "P0" },
-  { name: "none", displayName: "No Audio", category: "audio", description: "Remove audio stream", priority: "P1" },
 ]
 
 /** Priority labels for grouping display. */
