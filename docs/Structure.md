@@ -38,13 +38,16 @@
 | v2.2.0 / Phase 2 | 导航栏扩展 | AppNavbar.vue 新增 AutoCut 导航项 + auto-editor 状态徽标 |
 | v2.2.0 / Phase 2 | CommandPreview 扩展 | CommandPreview.vue 新增 type prop 支持 auto-editor 命令预览 |
 | v2.2.0 / Phase 2 | 国际化扩展 | en.ts / zh-CN.ts 新增 nav.autoCut 及 auto-cut 相关翻译键 |
-| v2.2.0 / Phase 2 | FileDropInput 扩展 | 新增 multiple prop 支持单文件约束模式 |
-| v2.2.0 / Phase 3 | BasicTab 组件 | 新建 BasicTab.vue，包含编辑方法/阈值/动作值/动态显隐，从 AutoCutPage 提取 |
-| v2.2.0 / Phase 3 | useAutoEditor 扩展 | 新增 speedValue/volumeValue ref，更新 buildParams |
-| v2.2.0 / Phase 3 | i18n 扩展 | en.ts/zh-CN.ts 新增 speed/volume 翻译键 |
-| v2.2.0 / Phase 4 | AdvancedTab 组件 | 新建 AdvancedTab.vue，6 个功能分区（Actions/Timeline/Container/Video/Audio/Misc），编码器动态查询，范围列表动态增删 |
-| v2.2.0 / Phase 4 | useAutoEditor 扩展 | 新增 encoderLists ref、编码器查询逻辑，更新 watch 依赖 |
-| v2.2.0 / Phase 4 | i18n 扩展 | en.ts/zh-CN.ts 新增 AdvancedTab 翻译键 |
+| v2.2.0 / Phase 2 | FileDropInput 扩展 | 新增 multiple prop，AutoCut 页面使用 :multiple="true" 支持多文件 |
+| v2.2.0 / Phase 3 | BasicTab 组件 | 新建 BasicTab.vue，包含编辑方法/阈值/独立speed-volume动作值/编码器选择，从 AutoCutPage 提取 |
+| v2.2.0 / Phase 3 | useAutoEditor 扩展 | silentSpeed/Volume + normalSpeed/Volume 独立 ref，selectedFile watch，immediate 预览 |
+| v2.2.0 / Phase 3 | i18n 扩展 | en.ts/zh-CN.ts 新增 speed/volume/encoder 翻译键 |
+| v2.2.0 / Phase 4 | AdvancedTab 组件 | 新建 AdvancedTab.vue，Actions/Timeline/Switches(8合1)/Video/Audio/Output 分区，curated encoder 列表 |
+| v2.2.0 / Phase 4 | autoEditorEncoders 数据 | 新建 autoEditorEncoders.ts，静态 curated 编码器列表（推荐/硬件加速/其他/自定义） |
+| v2.2.0 / Phase 4 | useAutoEditor 简化 | 移除 encoderLists/fetchEncoders，编码器改为静态列表 |
+| v2.2.0 / Phase 4 | i18n 扩展 | en.ts/zh-CN.ts 新增 AdvancedTab switches 翻译键 |
+| v2.2.0 / Phase 7-11 | 命令构建修正 | --edit audio:THRESHOLD 格式替代 --my-thresh，placeholder 预览支持 |
+| v2.2.0 / Phase 7-11 | 任务调度修正 | retry_task/reset_task 增加 auto_editor task_type 检查 |
 | v2.2.0 / Phase 5 | AutoEditorSetup 组件 | 新建 AutoEditorSetup.vue，auto-editor 路径设置与版本检测，集成到 SettingsPage |
 | v2.2.0 / Phase 5 | FileDropInput 扩展 | 新增 multiple prop，支持单文件约束模式 |
 | v2.2.0 / Phase 5 | TaskDTO 扩展 | 新增 task_type 字段，TaskRow 区分 auto_editor / ffmpeg 任务类型 |
@@ -111,7 +114,8 @@ ff-intelligent-neo/
 │   │   │   ├── AutoCutPage.vue          # 自动剪辑页面（v2.2.0 Phase 2）
 │   │   │   └── SettingsPage.vue
 │   │   ├── data/          # 静态数据（Phase 3）
-│   │   │   └── encoders.ts         # 编码器注册表
+│   │   │   ├── encoders.ts                # FFmpeg 编码器注册表
+│   │   │   └── autoEditorEncoders.ts      # Auto-Editor 编码器注册表 (v2.2.0 Phase 4)
 │   │   ├── types/         # TypeScript 类型定义
 │   │   └── style.css      # 全局样式（DaisyUI 主题配置）
 │   └── index.html
@@ -172,9 +176,10 @@ ff-intelligent-neo/
   - aspect_convert T/B 模式: 无全屏拖拽
 - Watermark FileDropInput 使用 `v-if` 而非 `opacity + pointer-events-none`，确保 unmount 时 document 事件监听器被清理
 
-**Phase 5 扩展: 单文件约束**:
+**Phase 5 扩展: 多文件支持**:
+- `multiple=true`（默认）时，拖拽和文件对话框均支持多文件，逐个 emit
 - `multiple=false` 时，拖拽或选择多个文件显示错误提示 "Please select only one file"
-- `AutoCutPage.vue` 使用 `:multiple="false"` 限制为单文件输入
+- `AutoCutPage.vue` 使用 `:multiple="true"` 支持多文件输入，命令预览使用占位文件
 - 现有多文件使用场景不受影响（`FilterForm.vue` 等默认 `multiple=true`）
 
 ---
@@ -364,9 +369,15 @@ const res = await call<{
 | `whenNormalAction` | `Ref<string>` | `'nil'` | 正常时动作 |
 | `margin` | `Ref<string>` | `'0.2s'` | 边距 |
 | `smooth` | `Ref<string>` | `'0.2s,0.1s'` | 平滑参数 |
-| `commandPreview` | `Ref<string>` | `''` | 命令预览文本（computed via backend call, debounced） |
+| `silentSpeedValue` | `Ref<number>` | `4` | 静音时 speed action 值 |
+| `silentVolumeValue` | `Ref<number>` | `0.5` | 静音时 volume action 值 |
+| `normalSpeedValue` | `Ref<number>` | `4` | 正常时 speed action 值 |
+| `normalVolumeValue` | `Ref<number>` | `0.5` | 正常时 volume action 值 |
+| `advancedOptions` | `Ref<AdvancedOptions>` | `{...}` | 高级选项（含 videoCodec/audioCodec 等） |
+| `commandPreview` | `Ref<string>` | `''` | 命令预览文本（immediate + debounced） |
 | `autoEditorStatus` | `Ref<{available, compatible, version, path}>` | `{available: false, ...}` | auto-editor 可用状态 |
-| `selectedFile` | `Ref<string | null>` | `null` | 已选输入文件路径 |
+| `selectedFile` | `Ref<string | null>` | `null` | 已选输入文件路径（AutoCutPage watcher 同步） |
+| `initializing` | `Ref<boolean>` | `true` | 初始化标志，防止状态栏闪烁 |
 
 **方法**:
 
@@ -374,15 +385,16 @@ const res = await call<{
 |------|------|---------|
 | `fetchStatus()` | 获取 auto-editor 可用状态 | `get_auto_editor_status` |
 | `setPath(path)` | 设置并验证 auto-editor 路径 | `set_auto_editor_path` |
-| `fetchEncoders(format)` | 查询指定格式的编码器列表 | `get_auto_editor_encoders` |
-| `updatePreview()` | 更新命令预览（300ms debounce） | `preview_auto_editor_command` |
+| `updatePreview()` | 更新命令预览（300ms debounce，immediate 触发） | `preview_auto_editor_command` |
 | `addToQueue()` | 验证参数并添加任务到队列 | `add_auto_editor_task` |
+| `buildParams(inputFile?)` | 构建命令参数字典 | - |
 
 **行为**:
-- `fetchStatus()` 在 composable 初始化时自动调用
-- `updatePreview()` 通过 `watch` 监听所有参数变化，debounced 300ms 调用后端
-- 切换 `editMethod` 时自动切换阈值值（audio <-> motion）
-- auto-editor 状态通过监听 `auto_editor_version_changed` 事件实时更新
+- `fetchStatus()` 在 `init()` 时调用，`initializing` 在 try/finally 中设为 false
+- `updatePreview()` 通过 `watch` 监听所有参数 + selectedFile 变化，`{ immediate: true }` 立即触发
+- 切换 `editMethod` 时自动切换阈值值（audio 0.04 <-> motion 0.02）
+- speed/volume 输入独立分离：silent 和 normal 各自拥有独立的 speed/volume ref
+- 编码器选择使用静态 curated 列表（`autoEditorEncoders.ts`），无动态查询
 ---
 
 ## 后端核心
@@ -780,28 +792,30 @@ CustomCommandPage
 
 #### AutoCutPage.vue
 
-<!-- v2.2.0-CHANGE: Phase 2 新增 -->
+<!-- v2.2.0-CHANGE: Phase 2 新增，Phase 7-11 重构 -->
 
 ```
-AutoCutPage (v2.2.0 Phase 2)
-  StatusBar              - auto-editor 可用状态显示
-  FileDropInput          - 单文件输入（:multiple="false"）
+AutoCutPage (v2.2.0 Phase 2+)
+  StatusBar              - auto-editor 可用状态（initializing 期间隐藏防闪烁）
+  FileDropInput          - 多文件输入（:multiple="true"），selectedFiles watcher 同步到 composable
   TabContainer           - [Basic] [Advanced] 选项卡
-  BasicTab.vue           - 基础选项卡（Phase 3 实现）
-  AdvancedTab.vue        - 高级选项卡（Phase 4 实现）
-  CommandPreview.vue     - 命令预览（type="auto-editor"）
-  "Add to Queue" Button - 添加自动剪辑任务
+  BasicTab.vue           - 基础选项卡（含编码器选择）
+  AdvancedTab.vue        - 高级选项卡（开关已整合）
+  CommandPreview.vue     - 命令预览（type="auto-editor"，immediate 触发）
+  "Add to Queue" Button - 多文件逐个添加，全成功后跳转队列
 ```
 
 **状态栏**:
+- `initializing=true` 时状态栏完全隐藏，防止短暂闪烁
 - 未配置: "Set auto-editor path in Settings"
-- 版本不兼容: "Version X not supported (need 30.1.x)"
-- 就绪: 隐藏（或绿色指示器）
+- 版本不兼容: "Version X not supported"
+- 就绪: 隐藏
 
 **行为**:
-- 未配置时 "Add to Queue" 按钮禁用
+- `!isReady || selectedFiles.length === 0` 时按钮禁用
 - 使用 `useAutoEditor` composable 管理所有状态
-- 添加任务后跳转到任务队列页面
+- 多文件支持：每个文件独立创建一个 auto-editor 任务
+- `selectedFile` 通过 watcher 从 `selectedFiles` 数组同步到 composable（取第一个文件用于预览）
 ---
 
 ### 配置组件
@@ -965,11 +979,11 @@ VC -> QM -> QV -> Resolution -> Framerate -> VB -> MB -> Bufsize -> EP -> PF -> 
 - 所有数值指标: `shrink-0` + `tabular-nums`（等宽数字对齐）
 #### BasicTab.vue
 
-<!-- v2.2.0-CHANGE: Phase 3 新增 -->
+<!-- v2.2.0-CHANGE: Phase 3 新增，Phase 7-11 重构 -->
 
 **路径**: `frontend/src/components/auto-cut/BasicTab.vue`
 
-**Props**: 无（通过 `useAutoEditor` composable 共享状态）
+**Props**: 所有参数通过 props 传入（非共享 composable 状态），包括 videoCodec/audioCodec
 
 **布局**: `grid grid-cols-1 md:grid-cols-2 gap-4` 两列网格
 
@@ -978,25 +992,28 @@ VC -> QM -> QV -> Resolution -> Framerate -> VB -> MB -> Bufsize -> EP -> PF -> 
 | Edit method | select | `editMethod` | audio / motion |
 | Threshold | range slider | `currentThreshold` (computed) | 0.01-0.20, step 0.01, 切换方法时自动切换默认值 |
 | When-silent action | select | `whenSilentAction` | cut / speed / volume / nil |
+| When-silent value | number input | `silentSpeedValue` 或 `silentVolumeValue` | 独立输入框，speed 默认4，volume 默认0.5，非 speed/volume 时冻结 |
 | When-normal action | select | `whenNormalAction` | nil / cut / speed / volume |
-| Speed value | number input | `speedValue` | 仅当 action 含 speed 时显示 |
-| Volume value | number input | `volumeValue` | 仅当 action 含 volume 时显示 |
+| When-normal value | number input | `normalSpeedValue` 或 `normalVolumeValue` | 独立输入框，speed 默认4，volume 默认0.5，非 speed/volume 时冻结 |
 | Margin | text input | `margin` | 如 "0.2s" |
 | Smooth mincut | text input | (smooth 第一部分) | 如 "0.2s" |
 | Smooth minclip | text input | (smooth 第二部分) | 如 "0.1s" |
+| Video Codec | categorized select | `videoCodec` | 推荐/硬件加速/其他/自定义，optgroup 分组 |
+| Audio Codec | categorized select | `audioCodec` | 推荐/其他/自定义，optgroup 分组 |
 
 **动态行为**:
 - 切换 `editMethod` 时 `audioThreshold`/`motionThreshold` 自动切换默认值
-- 选择 action 为 `speed:X` 时显示 Speed 输入框，值为 X
-- 选择 action 为 `volume:X` 时显示 Volume 输入框，值为 X
-- 选择 action 为 `cut`/`nil` 时隐藏值输入框
+- silent 和 normal 各自拥有独立的 speed/volume 输入框，不共用
+- 选择 action 为 `speed` 时显示 Speed 输入框（默认值4），选择 `volume` 时显示 Volume 输入框（默认值0.5）
+- 选择 action 为 `cut`/`nil` 时输入框冻结（disabled），避免排版变动
+- 编码器使用静态 curated 列表，分组显示（推荐/硬件加速/其他），支持自定义输入
 
 ---
 
 
 #### AdvancedTab.vue
 
-<!-- v2.2.0-CHANGE: Phase 4 新增 -->
+<!-- v2.2.0-CHANGE: Phase 4 新增，Phase 7-11 重构 -->
 
 **路径**: `frontend/src/components/auto-cut/AdvancedTab.vue`
 
@@ -1005,16 +1022,14 @@ VC -> QM -> QV -> Resolution -> Framerate -> VB -> MB -> Bufsize -> EP -> PF -> 
 | Prop | 类型 | 说明 |
 |------|------|------|
 | `advancedOptions` | `AdvancedOptions` | 高级选项 reactive 对象 |
-| `encoderLists` | `{video: string[], audio: string[], subtitle: string[], other: string[]}` | 编码器列表（从后端查询） |
 
 **Events**:
 
 | 事件 | 参数 | 说明 |
 |------|------|------|
 | `update:advancedOptions` | `value: AdvancedOptions` | 高级选项变更 |
-| `fetch-encoders` | `format: string` | 请求查询指定格式的编码器 |
 
-**布局**: 6 个功能分区，使用 `card` 包裹每个分区
+**布局**: Actions / Timeline / Switches / Video params / Audio params / Output
 
 | 分区 | 控件 | 类型 | 说明 |
 |------|------|------|------|
@@ -1024,25 +1039,22 @@ VC -> QM -> QV -> Resolution -> Framerate -> VB -> MB -> Bufsize -> EP -> PF -> 
 | Timeline | Frame rate | text input | 如 "30" |
 | Timeline | Sample rate | text input | 如 "44100" |
 | Timeline | Resolution | text input | 如 "1920x1080" |
-| Container | -vn/-an/-sn/-dn | toggle switches | 禁用视频/音频/字幕/数据流 |
-| Container | Faststart | toggle switch | 默认 ON（不发 flag），OFF 时发 `--no-faststart` |
-| Container | Fragmented | toggle switch | 默认 OFF（不发 flag），ON 时发 `--fragmented` |
-| Video | Codec select | select dropdown | 从 `get_auto_editor_encoders(format)` 动态填充 |
-| Video | Bitrate | text input | 如 "5M" |
-| Video | CRF | text input | 如 "23" |
-| Audio | Codec select | select dropdown | 从 `get_auto_editor_encoders(format)` 动态填充 |
-| Audio | Bitrate | text input | 如 "128k" |
-| Audio | Layout | text input | 音频布局，如 "stereo" |
-| Audio | Normalize | select dropdown | none / peak / ebu |
-| Misc | No-cache | toggle switch | 禁用缓存 |
-| Misc | Open | toggle switch | 完成后自动打开（含队列警告提示） |
-| Misc | Output extension | select dropdown | mp4 / mkv / mov |
+| Switches | -vn/-an/-sn/-dn | toggle | 禁用视频/音频/字幕/数据流 |
+| Switches | Faststart | toggle | 默认 ON（不发 flag），OFF 时发 `--no-faststart` |
+| Switches | Fragmented | toggle | 默认 OFF，ON 时发 `--fragmented` |
+| Switches | No-cache | toggle | 禁用缓存 |
+| Switches | Open | toggle | 完成后自动打开（含队列警告提示） |
+| Video params | Bitrate | text input | 如 "5M" |
+| Video params | CRF | text input | 如 "23" |
+| Audio params | Bitrate | text input | 如 "128k" |
+| Audio params | Layout | text input | 如 "stereo" |
+| Audio params | Normalize | select | none / peak / ebu |
+| Output | Output extension | select | .mp4 / .mkv / .mov |
 
 **动态行为**:
-- Output extension 变更时触发 `fetch-encoders` 事件重新查询编码器列表
-- Codec 下拉框在有查询结果时填充，无结果时显示空选项
-- 范围列表支持动态 add/remove，每行为两个（或三个）文本输入 + 删除按钮
-- Container toggles 遵循 auto-editor 的 flag 逻辑：faststart ON=无flag, OFF=`--no-faststart`; fragmented 反之
+- 8 个 toggle 开关统一在 Switches 分区，使用 `grid grid-cols-2 md:grid-cols-4` 排列
+- 编码器选择已移至 BasicTab，AdvancedTab 不再包含编码器下拉框
+- 范围列表支持动态 add/remove
 
 #### AutoEditorSetup.vue
 
@@ -1073,7 +1085,7 @@ VC -> QM -> QV -> Resolution -> Framerate -> VB -> MB -> Bufsize -> EP -> PF -> 
 - 操作按钮:
   - "Auto Detect" 按钮: 尝试从 PATH 查找 auto-editor（调用 `get_auto_editor_status`）
   - "Select Binary" 按钮: 打开文件选择器选择二进制路径（emit `select-binary`）
-- 路径显示: 配置成功后显示当前路径
+- 路径显示: 容器使用 `min-h-[2.5rem]` 预留空间，避免路径显示后排版变动
 
 **行为**:
 - 组件 mount 时自动 fetch 一次 status

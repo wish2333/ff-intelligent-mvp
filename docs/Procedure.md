@@ -1026,29 +1026,30 @@ sequenceDiagram
   -> 重新评估状态栏和按钮状态
 ```
 
-### Auto-Editor 命令预览流程（v2.2.0 Phase 2）
+### Auto-Editor 命令预览流程（v2.2.0 Phase 2, Phase 7-11 优化）
 
-<!-- v2.2.0-CHANGE: 新增 auto-editor 命令预览流程 -->
+<!-- v2.2.0-CHANGE: 命令预览流程更新：immediate 触发 + placeholder 支持 -->
 
 ```
-用户修改任意 auto-editor 参数
--> Vue reactive state 更新（useAutoEditor composable）
--> watch 触发（监听所有参数）
+AutoCutPage onMounted + useAutoEditor composable 初始化
+-> watch (所有参数 + selectedFile, { immediate: true }) 立即触发
 -> debounceTimer = setTimeout(updatePreview, 300)
 -> updatePreview():
   -> 构建 params dict:
-    -> edit, threshold (audio/motion), margin, smooth
-    -> when_silent, when_normal
-    -> input_file (selectedFile.value)
+    -> edit, threshold, margin, smooth
+    -> when_silent (silentSpeedValue/silentVolumeValue), when_normal (normalSpeedValue/normalVolumeValue)
+    -> input_file = overrideInputFile ?? selectedFile.value ?? "_placeholder.mp4"
+    -> video_codec, audio_codec, ... (advanced options)
   -> call("preview_auto_editor_command", params)
   -> 后端:
-    -> validate_local_input(input_file)
+    -> placeholder 路径 ("_placeholder.mp4") 跳过 validate_local_input
     -> build_command(params, _preview_mode=True)
+    -> --edit audio:THRESHOLD 格式嵌入阈值
     -> 返回: {success, data: {argv: [...], display: str}}
   -> 前端:
     -> commandPreview.value = data.display
     -> CommandPreview.vue (type="auto-editor") 纯文本渲染
--> Vue re-render: 命令预览区域更新
+-> 用户选择文件 -> selectedFile watcher 触发 -> debounced preview 更新
 ```
 
 **与 FFmpeg 命令预览的区别**:

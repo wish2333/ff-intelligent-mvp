@@ -12,7 +12,6 @@
 import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { call } from "../../bridge"
-import { toWebViewFileTypes } from "../../composables/useFileFormats"
 
 const { t } = useI18n()
 
@@ -89,11 +88,14 @@ async function onDrop(e: DragEvent): Promise<void> {
       error.value = t("common.onlyOneFile")
       return
     }
-    const path = res.data[0]
-    if (validateExtension(path)) {
-      emit("update:modelValue", path)
-    } else {
-      error.value = t("common.unsupportedFileType", { accept: props.accept })
+    const paths = props.multiple ? res.data : [res.data[0]]
+    for (const path of paths) {
+      if (validateExtension(path)) {
+        emit("update:modelValue", path)
+      } else {
+        error.value = t("common.unsupportedFileType", { accept: props.accept })
+        break
+      }
     }
   }
 }
@@ -129,11 +131,14 @@ async function onFullscreenDrop(e: DragEvent): Promise<void> {
       error.value = t("common.onlyOneFile")
       return
     }
-    const path = res.data[0]
-    if (validateExtension(path)) {
-      emit("update:modelValue", path)
-    } else {
-      error.value = t("common.unsupportedFileType", { accept: props.accept })
+    const paths = props.multiple ? res.data : [res.data[0]]
+    for (const path of paths) {
+      if (validateExtension(path)) {
+        emit("update:modelValue", path)
+      } else {
+        error.value = t("common.unsupportedFileType", { accept: props.accept })
+        break
+      }
     }
   }
 }
@@ -141,17 +146,30 @@ async function onFullscreenDrop(e: DragEvent): Promise<void> {
 async function openFileDialog(): Promise<void> {
   error.value = ""
   try {
-    const fileTypes = toWebViewFileTypes(props.accept)
-    const res = await call<string>("select_file_filtered", fileTypes)
-    if (res.success && res.data) {
-      if (validateExtension(res.data)) {
-        emit("update:modelValue", res.data)
-      } else {
-        error.value = t("common.unsupportedFileType", { accept: props.accept })
+    if (props.multiple) {
+      const res = await call<string[]>("select_files")
+      if (res.success && res.data && res.data.length > 0) {
+        for (const path of res.data) {
+          if (validateExtension(path)) {
+            emit("update:modelValue", path)
+          } else {
+            error.value = t("common.unsupportedFileType", { accept: props.accept })
+            return
+          }
+        }
+      }
+    } else {
+      const res = await call<string>("select_file_filtered")
+      if (res.success && res.data) {
+        if (validateExtension(res.data)) {
+          emit("update:modelValue", res.data)
+        } else {
+          error.value = t("common.unsupportedFileType", { accept: props.accept })
+        }
       }
     }
   } catch (err) {
-    console.error("[FileDropInput] select_file_filtered failed:", err)
+    console.error("[FileDropInput] file dialog failed:", err)
     error.value = t("common.fileDialogFailed")
   }
 }

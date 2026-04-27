@@ -10,7 +10,7 @@
 
 import { ref, watch } from "vue"
 import { call, onEvent } from "../bridge"
-import type { AeStatus, AdvancedOptions, EncoderLists } from "../types/autoEditor"
+import type { AeStatus, AdvancedOptions } from "../types/autoEditor"
 
 const PREVIEW_DEBOUNCE_MS = 300
 
@@ -23,15 +23,10 @@ export function useAutoEditor() {
   const whenNormalAction = ref("nil")
   const margin = ref("0.2s")
   const smooth = ref("0.2s,0.1s")
-  const speedValue = ref(4)
-  const volumeValue = ref(0.5)
-
-  const encoderLists = ref<EncoderLists>({
-    video: [],
-    audio: [],
-    subtitle: [],
-    other: [],
-  })
+  const silentSpeedValue = ref(4)
+  const silentVolumeValue = ref(0.5)
+  const normalSpeedValue = ref(4)
+  const normalVolumeValue = ref(0.5)
 
   const advancedOptions = ref<AdvancedOptions>({
     cutOutRanges: [],
@@ -60,6 +55,7 @@ export function useAutoEditor() {
 
   const commandPreview = ref("")
   const selectedFile = ref<string | null>(null)
+  const initializing = ref(true)
   const autoEditorStatus = ref<AeStatus>({
     available: false,
     compatible: false,
@@ -76,9 +72,13 @@ export function useAutoEditor() {
   // --- Methods ---
 
   async function fetchStatus(): Promise<void> {
-    const res = await call<AeStatus>("get_auto_editor_status")
-    if (res.success && res.data) {
-      autoEditorStatus.value = res.data
+    try {
+      const res = await call<AeStatus>("get_auto_editor_status")
+      if (res.success && res.data) {
+        autoEditorStatus.value = res.data
+      }
+    } catch {
+      // bridge not ready yet
     }
   }
 
@@ -97,43 +97,47 @@ export function useAutoEditor() {
     return false
   }
 
-  async function fetchEncoders(format: string): Promise<void> {
-    const res = await call<EncoderLists>("get_auto_editor_encoders", format)
-    if (res.success && res.data) {
-      encoderLists.value = res.data
-    } else {
-      encoderLists.value = { video: [], audio: [], subtitle: [], other: [] }
-      if (res.error) {
-        alertMessage.value = res.error
-        alertType.value = "error"
-        clearAlert()
-      }
-    }
-  }
-
-  function buildParams(): Record<string, unknown> {
+  function buildParams(overrideInputFile?: string): Record<string, unknown> {
+    const inputFile = overrideInputFile ?? selectedFile.value ?? "_placeholder.mp4"
     const params: Record<string, unknown> = {
       edit: editMethod.value,
-      threshold: editMethod.value === "audio"
-        ? audioThreshold.value
-        : motionThreshold.value,
-      when_silent: whenSilentAction.value === "cut"
-        ? "cut"
-        : whenSilentAction.value === "speed"
-          ? `speed:${speedValue.value}`
-          : whenSilentAction.value === "volume"
-            ? `volume:${volumeValue.value}`
-            : whenSilentAction.value,
-      when_normal: whenNormalAction.value === "cut"
-        ? "cut"
-        : whenNormalAction.value === "speed"
-          ? `speed:${speedValue.value}`
-          : whenNormalAction.value === "volume"
-            ? `volume:${volumeValue.value}`
-            : whenNormalAction.value,
-      margin: margin.value,
-      smooth: smooth.value,
-      input_file: selectedFile.value ?? "",
+      input_file: inputFile,
+    }
+
+    // Threshold
+    const threshold = editMethod.value === "audio"
+      ? audioThreshold.value
+      : motionThreshold.value
+    params.threshold = threshold
+
+    // When-silent action (only pass when not default "cut")
+    if (whenSilentAction.value === "speed") {
+      params.when_silent = `speed:${silentSpeedValue.value}`
+    } else if (whenSilentAction.value === "volume") {
+      params.when_silent = `volume:${silentVolumeValue.value}`
+    } else if (whenSilentAction.value !== "cut") {
+      params.when_silent = whenSilentAction.value
+    }
+    // Default "cut" is auto-editor's default, no need to pass
+
+    // When-normal action (only pass when not default "nil")
+    if (whenNormalAction.value === "cut") {
+      params.when_normal = "cut"
+    } else if (whenNormalAction.value === "speed") {
+      params.when_normal = `speed:${normalSpeedValue.value}`
+    } else if (whenNormalAction.value === "volume") {
+      params.when_normal = `volume:${normalVolumeValue.value}`
+    }
+    // Default "nil" is auto-editor's default, no need to pass
+
+    // Margin (only pass when not default "0.2s")
+    if (margin.value && margin.value !== "0.2s") {
+      params.margin = margin.value
+    }
+
+    // Smooth (only pass when not default "0.2s,0.1s")
+    if (smooth.value && smooth.value !== "0.2s,0.1s") {
+      params.smooth = smooth.value
     }
 
     const adv = advancedOptions.value
@@ -164,45 +168,44 @@ export function useAutoEditor() {
   }
 
   async function updatePreview(): Promise<void> {
-    if (!selectedFile.value) {
-      commandPreview.value = ""
-      return
-    }
-
     validating.value = true
-    const params = buildParams()
+    try {
+      const params = buildParams()
 
-    const res = await call<{ argv: string[]; display: string }>(
-      "preview_auto_editor_command",
-      params,
-    )
+      const res = await call<{ argv: string[]; display: string }>(
+        "preview_auto_editor_command",
+        params,
+      )
 
-    validating.value = false
-
-    if (res.success && res.data) {
-      commandPreview.value = res.data.display
-    } else {
-      commandPreview.value = ""
-      if (res.error) {
-        alertMessage.value = res.error
-        alertType.value = "error"
-        clearAlert()
+      if (res.success && res.data) {
+        commandPreview.value = res.data.display
+      } else {
+        commandPreview.value = ""
+        if (res.error) {
+          alertMessage.value = res.error
+          alertType.value = "error"
+          clearAlert()
+        }
       }
+    } catch {
+      commandPreview.value = ""
+    } finally {
+      validating.value = false
     }
   }
 
-  async function addToQueue(): Promise<boolean> {
-    if (!selectedFile.value) {
+  async function addToQueue(inputFile: string): Promise<boolean> {
+    if (!inputFile) {
       alertMessage.value = "noFileSelected"
       alertType.value = "error"
       clearAlert()
       return false
     }
 
-    const params = buildParams()
+    const params = buildParams(inputFile)
     const res = await call<{ task_id: string }>(
       "add_auto_editor_task",
-      selectedFile.value,
+      inputFile,
       params,
     )
 
@@ -222,12 +225,14 @@ export function useAutoEditor() {
   // --- Watch for parameter changes -> debounced preview ---
   watch(
     [editMethod, audioThreshold, motionThreshold, whenSilentAction,
-     whenNormalAction, margin, smooth, speedValue, volumeValue,
-     selectedFile, advancedOptions],
+     whenNormalAction, margin, smooth, silentSpeedValue, silentVolumeValue,
+     normalSpeedValue, normalVolumeValue,
+     advancedOptions, selectedFile],
     () => {
       if (debounceTimer) clearTimeout(debounceTimer)
       debounceTimer = setTimeout(updatePreview, PREVIEW_DEBOUNCE_MS)
     },
+    { immediate: true },
   )
 
   // --- Event listener for version changes ---
@@ -251,7 +256,11 @@ export function useAutoEditor() {
 
   // --- Lifecycle ---
   async function init(): Promise<void> {
-    await fetchStatus()
+    try {
+      await fetchStatus()
+    } finally {
+      initializing.value = false
+    }
     unsubscribeVersion = setupEventListeners()
   }
 
@@ -279,20 +288,21 @@ export function useAutoEditor() {
     whenNormalAction,
     margin,
     smooth,
-    speedValue,
-    volumeValue,
+    silentSpeedValue,
+    silentVolumeValue,
+    normalSpeedValue,
+    normalVolumeValue,
     advancedOptions,
-    encoderLists,
     commandPreview,
     selectedFile,
     autoEditorStatus,
+    initializing,
     validating,
     alertMessage,
     alertType,
     // Methods
     fetchStatus,
     setPath,
-    fetchEncoders,
     updatePreview,
     addToQueue,
     buildParams,

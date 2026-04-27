@@ -116,10 +116,12 @@ async function handleAutoDetect(): Promise<void> {
       </button>
     </div>
 
-    <!-- Current path -->
-    <div v-if="status.available && status.path" class="text-xs space-y-1">
-      <p class="font-medium opacity-60">{{ t("settings.autoEditor.currentPath") }}</p>
-      <p class="truncate opacity-50" :title="status.path">{{ status.path }}</p>
+    <!-- Current path (space reserved to avoid layout shift) -->
+    <div class="text-xs space-y-1 min-h-[2.5rem]">
+      <template v-if="status.available && status.path">
+        <p class="font-medium opacity-60">{{ t("settings.autoEditor.currentPath") }}</p>
+        <p class="truncate opacity-50" :title="status.path">{{ status.path }}</p>
+      </template>
     </div>
   </div>
 </template>

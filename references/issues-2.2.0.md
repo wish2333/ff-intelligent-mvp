@@ -428,6 +428,42 @@ Summary of changes:
        #3034  4:40 AM  🟣  Auto-Cut Feature Build Validation Complete
      #S4 Auto-Editor Feature Phase 1-4 Implementation and Code Review Fixes (Apr 27, 4:40 AM)
 
+### 📝 Commit Message
+
+```
+feat(auto-cut): 新增基础与高级Tab组件
+
+- 提取 BasicTab：编辑方式、阈值、静音/正常动作（动态
+  速度/音量）、边距、平滑设置
+- 提取 AdvancedTab：动作、时间轴、容器、视频、音频、杂项
+  6大配置区，支持动态增删范围列表
+- useAutoEditor 扩展 speedValue/volumeValue 及
+  encoderLists 编码器列表查询
+- 类型定义集中至 autoEditor.ts 消除重复
+- 不可变数组操作(filter/map)，Tab 切换 v-show 优化
+- 修复 FileDropInput v-model 语法错误
+```
+
+### 🚀 Release Notes
+
+```
+## 2026-04-27 - 自动剪辑配置界面升级
+
+### ✨ 新增
+- 自动剪辑页面改为分页式配置：基础设置与高级设置各自独立
+- 基础设置：支持编辑方式选择、阈值调节、静音/正常时段动作
+  配置（根据动作类型动态显示速度或音量调节）、边距与平滑设置
+- 高级设置：提供动作规则、时间轴范围（支持动态增删）、
+  容器格式、视频编码、音频编码及杂项共6大配置区域
+- 编码器列表根据所选容器格式自动查询并更新
+
+### 🐛 修复
+- 修复文件拖放输入框绑定异常的问题
+
+### ⚡ 优化
+- 切换基础/高级标签页时不再销毁重建组件，切换更流畅
+```
+
 ## Phase 5 6
 
 ### 完成总结
@@ -557,6 +593,326 @@ Summary of changes:
        #3124           ✅  PRD-2.2.0.md updated with Phase 6 documentation changes
      ..\..\Git\GithubManager\ff-intelligent-neo\references\test-guide-2.2.0.md
        #3125  5:43 AM  🟣  Phase 6 integration test guide created
+
+### 📝 Commit Message
+
+```
+feat(auto-editor): 新增自动剪辑设置与任务类型标识
+
+- 新建 AutoEditorSetup 组件并集成至全局设置页
+- Task 模型新增 task_type 字段，任务列表展示专属标签
+- FileDropInput 新增 multiple 属性支持单文件约束
+- 同步更新 Phase 5 业务规则、流程文档及国际化文案
+```
+
+### 🚀 Release Notes
+
+```
+## 2024-05-25 - 自动剪辑设置与任务管理增强
+
+### ✨ 新增
+- 新增自动剪辑工具路径设置功能，方便统一配置工具环境
+- 任务队列支持区分任务类型，自动剪辑任务将展示专属标识
+
+### ⚡ 优化
+- 文件拖拽区域支持限制仅允许拖入单个文件，避免误操作
+```
+
+## 测试修复
+
+## Phase7-11测试结果
+
+- FP-03测试不通过：有有效auto-editor后，仍然显示“请在设置中配置 auto-editor 路径”
+- FP-06测试不通过，有有效auto-editor后仍不可点击
+- FB-04  优化方向：到0.1和0.2时显示0.10和0.20避免布局变动
+- FB相关优化方向：这些参数都是必须要传入或者这些数值都是默认传入的值吗，不是的话，应该默认设为不传入，选择了相关选项才传入。此外，输入框不要出现消失，选择了不需要输入框的选项时冻结住就行了，这样才能避免排版变动。
+- FB-11测试不通过，命令预览没有任何更新。也因此，相关测试无法测试
+- FA-04测试不通过，视频/音频编码器下拉框未填充编码器列表  。也因此FA-05无法测试
+- FS-02测试不通过，点击不打开文件选择
+- FS-03测试不通过，有有效auto-editor后，仍然显示“未配置”。但FS-07测试通过
+- FS相关问题，相关的持久化配置是否保存到并读取在：软件目录\data\ 文件夹中
+
+已完成一轮修复，进行第二轮测试，详细内容如下：
+
+## 第二轮测试结果
+
+- FB相关优化不正确：我看到现在静音时和正常时共用了速度和音量输入框，这不对，他们的输入框应该是独立的。而且分别支配一个“速度/音量”输入框即可，输入框选到速度是显示默认值4，选音量时显示默认值0.5
+- FP-03优化不完全：有有效auto-editor后，仍然短暂显示“请在设置中配置 auto-editor 路径”过了一秒左右才消失。
+- 自动剪辑页面的FileDropInput：点击未弹出文件选择器
+- FD-02：应该支持拖入多个，命令预览显示文件占位符（input.mp4）即可（始终这样，能够让命令预览在没有输入文件的时候也能够预览命令），添加到队列时分别带着标识符依次传入队列即可
+- FQ测试：自动剪辑任务添加到队列之后，任务带有自动剪辑标识，但是执行发现运行的是ffmpeg命令：core.ffmpeg_runner:run_single - Running: C:\Program Files\FFmpeg\ffmpeg.EXE -hide_banner -y -i Q:\Git\GithubManager\ff-intelligent-neo\test_files\20260327Fly.mkv -c:v libx264 -c:a aac -b:a 128k -y Q:\Git\GithubManager\ff-intelligent-neo\test_files\20260327Fly.mp4
+- 添加了一次到队列之后，又显示“请在设置中配置 auto-editor 路径”了。好像不是添加到队列的问题，而是设置完之后一切出设置界面设置界面就又“未配置”了，查看本地持久化文件是有auto-editor二进制路径的
+
+  Changes Summary
+
+  1. FB: Independent speed/volume inputs (silent vs normal)
+
+  - useAutoEditor.ts: Split speedValue/volumeValue into
+    silentSpeedValue/silentVolumeValue/normalSpeedValue/normalVolumeValue, all defaulting to 4 (speed) or 0.5 (volume)
+  - BasicTab.vue: Updated props/emits to use independent pairs. Each section (silent/normal) now shows a single input
+    that switches between speed/volume based on the selected action, with frozen disabled state when no value is needed
+    (cut/nil)
+  - AutoCutPage.vue: Updated destructuring and bindings for the new independent props
+  - en.ts / zh-CN.ts: Added noValueNeeded i18n key
+
+  2. FP-03: Flash of "not configured" status
+
+  - AutoCutPage.vue: Added initializing to destructured exports, status bar now uses v-if="statusMessage &&
+    !initializing"
+  - useAutoEditor.ts: Wrapped fetchStatus() in try/finally so initializing is always cleared
+
+  3. FileDropInput click + multi-file (FD-02)
+
+  - FileDropInput.vue:
+    - Removed toWebViewFileTypes import (file_types were causing dialog issues on Windows; frontend still validates
+    extensions)
+    - Drop handlers now emit all files when multiple=true
+    - openFileDialog now uses select_files (multi-file) when multiple=true, select_file_filtered (single) otherwise
+
+  4. Command preview when no file selected
+
+  - auto_editor_api.py: preview_auto_editor_command now skips file validation for _placeholder.mp4 paths, allowing the
+    command preview to always show
+
+  5. FQ: Auto-editor tasks dispatched correctly
+
+  - main.py: retry_task now checks task_type == 'auto_editor' and delegates to auto-editor API
+  - auto_editor_api.py: start_auto_editor_task no longer pops pending params, so retry can reuse them
+
+  - Recommended — libx264 (H.264), libx265 (H.265/HEVC) — always available
+  - Hardware (GPU) — h264_nvenc, hevc_nvenc, av1_nvenc (NVIDIA), h264_amf, hevc_amf (AMD), h264_qsv, hevc_qsv (Intel),
+    h264_videotoolbox, hevc_videotoolbox (Apple VT)
+  - Other — libsvtav1, libvpx-vp9, mpeg4
+  - Custom... — text input for any encoder name
+
+
+
+  docs/Structure.md — Updated:
+  - Version index: Phase 2-4 entries reflect actual implementation (multi-file, independent speed/volume, static encoder
+      lists, consolidations)
+  - Directory tree: added autoEditorEncoders.ts
+  - FileDropInput: multi-file support instead of single-file constraint
+  - useAutoEditor: independent speed/volume refs, removed encoderLists/fetchEncoders, added initializing/selectedFile,
+    immediate preview
+  - BasicTab: added codec selectors, independent action value inputs, frozen disabled state
+  - AdvancedTab: restructured to Actions/Timeline/Switches/Video/Audio/Output
+  - AutoCutPage: multi-file input, initializing flash prevention
+  - AutoEditorSetup: reserved path space
+
+  docs/BusinessRules.md — Updated:
+  - Input validation: multi-file support
+  - Command building: --edit METHOD:THRESHOLD format, placeholder preview, immediate trigger
+  - Phase 2 page rules: initializing hide, multi-file, immediate preview, independent action values
+  - Phase 4 rules: static curated encoder lists, Switches consolidation
+  - FileDropInput rules: multi-file emit, no file_types to pywebview
+  - Settings rules: reserved path space
+
+  docs/Procedure.md — Updated command preview flow with immediate trigger and placeholder support.
+
+  references/PRD-2.2.0.md — Updated:
+  - AutoCutPage layout (multi-file, immediate preview)
+  - Phase 3 BasicTab (codecs, independent speed/volume, frozen inputs)
+  - Phase 4 AdvancedTab (Switches consolidation, codecs moved)
+  - Phase 5 FileDropInput (multi-file support)
+  - Added Phase 7: Bugfixes & Refinements section
+  - Updated Out of Scope
+
+  README.md — Added Auto Cut feature, auto-editor core/frontend files, page route, prerequisites.
+
+### CC-Mem
+
+```
+[ff-intelligent-neo] recent context, 2026-04-27 5:40pm GMT+8
+────────────────────────────────────────────────────────────
+
+Legend: session-request | 🔴 bugfix | 🟣 feature | 🔄 refactor | ✅ change | 🔵 discovery | ⚖️ decision
+
+Column Key
+  Read: Tokens to read this observation (cost to learn it now)
+  Work: Tokens spent on work that produced this record ( research, building, deciding)
+
+Context Index: This semantic index (titles, types, files, tokens) is usually sufficient to understand past work.
+
+When you need implementation details, rationale, or debugging context:
+  - Fetch by ID: get_observations([IDs]) for observations visible in this index
+  - Search history: Use the mem-search skill for past decisions, bugs, and deeper research
+  - Trust this index over re-reading code for past decisions and learnings
+
+Context Economics
+  Loading: 120 observations (29,244 tokens to read)
+  Work investment: 0 tokens spent on research, building, and decisions
+
+Apr 23, 2026
+
+#S2 ComboInput component enhanced with improved filtering behavior (Apr 23, 12:50 AM)
+
+#S1 Audio transcoding parameter consistency fix - user requested explanation of changes made to ensure passed parameters match command preview (Apr 23, 12:50 AM)
+
+#S3 Frontend Code Review for UX Issues and FFmpeg Preview Optimization (Apr 23, 12:54 AM)
+
+
+Apr 27, 2026
+
+#S4 Auto-Editor Feature Phase 1-4 Implementation and Code Review Fixes (Apr 27, 4:40 AM)
+
+General
+  #3126  6:11 AM  🔵  Backend testing initiated for auto-editor functionality  
+references/test-guide-2.2.0.md
+  #3128           🔵  Test guide v2.2.0 defines 6 backend functionality test items  
+  #3129           🔵  Test guide items 4-6 cover API integration, error handling, and end-to-end video processing  
+core/models.py
+  #3130  6:12 AM  🔵  Backend codebase size determined for testing planning  
+core/auto_editor_runner.py
+  #3131           🔵  auto_editor_runner.py implements command building, input validation, and progress parsing for auto-editor integration  
+core/auto_editor_api.py
+  #3132           🔵  AutoEditorApi class provides backend API layer with path management, encoder querying, and task lifecycle management  
+core/models.py
+  #3133           🔵  models.py defines frozen dataclasses for type-safe data transfer with serialization support  
+test_backend_phase1_6.py
+  #3134  6:15 AM  🟣  Comprehensive test suite created for backend functionality testing (sections 1-6)  
+  #3135  6:18 AM  🔴  Test cases BE-04 and BE-05 fixed to properly test extension validation with real temporary files  
+core/auto_editor_runner.py
+  #3136           🔴  Path traversal prevention logic fixed in generate_output_path function  
+test_backend_phase1_6.py
+  #3137  6:19 AM  🔵  Backend test suite completed successfully with 61/61 tests passing for sections 1-6  
+  #3139  6:22 AM  🔵  Backend test suite confirmed stable with 61/61 tests passing across multiple test runs  
+TEST_RESULTS.md
+  #3140  6:23 AM  🔵  Comprehensive test results documentation created for backend testing sections 1-6  
+General
+  #3141  1:51 PM  🔵  Auto-Editor Integration Has Configuration Detection Issues  
+  #3142           🔵  UI Layout Instability from Dynamic Input Fields  
+  #3143           🔵  Core Features Not Functional  
+  #3144           🔵  Persistent Configuration Storage Location Unclear  
+frontend/src/components/settings/AutoEditorSetup.vue
+  #3145           🔵  Auto-Editor Configuration Component Located  
+frontend/src/composables/useAutoEditor.ts
+  #3146           🔵  Auto-Editor Logic Architecture Mapped  
+  #3147  1:54 PM  🔵  Auto-Editor Status Validation Logic Identified  
+  #3148           🔵  Command Preview Update Mechanism Identified  
+  #3149           🔵  Encoder Fetching System Identified  
+main.py
+  #3150  1:55 PM  🔵  Backend API Architecture Identified  
+frontend/src/pages/SettingsPage.vue
+  #3151           🔵  Settings Page Auto-Editor Integration Flow  
+main.py
+  #3152           🔵  File Selection API Method Name Mismatch  
+frontend/src/components/settings/FFmpegSetup.vue
+  #3153  1:56 PM  🔵  Two Separate Binary Selection Flows Identified  
+main.py
+  #3154           🔵  File Dialog Backend Implementation Details  
+  #3155           🔵  File Dialog Method Selection Strategy  
+frontend/src/pages/AutoCutPage.vue
+  #3156  1:58 PM  🔵  Status Update Root Cause Identified  
+core/config.py
+  #3157           🔵  Settings Persistence Architecture Confirmed  
+General
+  #3158           ⚖️  Task Prioritization Strategy Established  
+frontend/src/components/auto-cut/BasicTab.vue
+  #3159  1:59 PM  🔵  BasicTab UI Component Architecture  
+core/paths.py
+  #3160           🔵  Settings Persistence Location Confirmed as Application Directory/data  
+frontend/src/components/auto-cut/BasicTab.vue
+  #3161  2:00 PM  🔵  BasicTab Layout Instability Implementation Details  
+frontend/src/components/layout/AppNavbar.vue
+  #3162           🔵  AppNavbar Also Fetches Auto-Editor Status  
+  #3163  2:01 PM  🔵  AppNavbar Auto-Editor Event Handler Implementation  
+frontend/src/pages/SettingsPage.vue
+  #3164           🔴  Fixed FS-02: File Picker Method Name  
+  #3165           🔴  Fixed SettingsPage Status Fetch Timing  
+frontend/src/pages/AutoCutPage.vue
+  #3166  2:02 PM  🔴  Added waitForPyWebView Import to AutoCutPage  
+  #3167           🔴  Fixed AutoCutPage Status Fetch Race Condition  
+frontend/src/composables/useAutoEditor.ts
+  #3168           🔴  Added Error Handling to useAutoEditor.fetchStatus()  
+  #3169  2:03 PM  🔴  Fixed updatePreview Error Handling and Loading State  
+  #3170           🔴  Added Error Handling to fetchEncoders Function  
+frontend/src/components/auto-cut/BasicTab.vue
+  #3171           ✅  Added Fixed Decimal Formatting for Threshold Display  
+  #3172           ✅  Applied Fixed Decimal Formatting to Threshold Label  
+  #3173  2:05 PM  🔄  Refactored Speed/Volume Inputs to Always-Visible Disabled State  
+frontend/src/composables/useAutoEditor.ts
+  #3174           🔄  Optimized buildParams to Only Pass Non-Default Values  
+..\..\Git\GithubManager\ff-intelligent-neo\core\auto_editor_api.py
+  #3177  2:27 PM  🔵  Auto Editor Task Implementation Found  
+..\..\Git\GithubManager\ff-intelligent-neo\main.py
+  #3179  2:28 PM  🔵  Queue Change Notification System  
+  #3180  2:29 PM  🔵  Task Runner Initialization Pattern  
+..\..\Git\GithubManager\ff-intelligent-neo\core\auto_editor_api.py
+  #3181  2:30 PM  🔵  Auto Editor Backend System Analysis  
+..\..\Git\GithubManager\ff-intelligent-neo\main.py
+  #3182           🔵  FFmpeg Task Configuration Structure  
+  #3183  2:31 PM  🔵  Task Creation and Background Probing  
+General
+  #3184  2:32 PM  🔵  Task Management Operations  
+..\..\Git\GithubManager\ff-intelligent-neo\core\task_runner.py
+  #3185  2:33 PM  🔵  Task Runner Start Task Method  
+..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\composables\useTaskControl.ts
+  #3186           🔵  Frontend Task Control Implementation  
+  #3187  2:34 PM  🔵  Frontend Task Auto-Start Implementation  
+..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\common\FileDropInput.vue
+  #3188           🔵  File Drop Input Component  
+  #3189  2:36 PM  🔵  FileDropInput Component Structure  
+  #3190           🔵  File Selection Validation Logic  
+General
+  #3191  2:37 PM  ✅  Critical Auto Editor Task Dispatch Fix Identified  
+..\..\Git\GithubManager\ff-intelligent-neo\main.py
+  #3192  2:38 PM  🔵  Main API start_task Implementation  
+  #3193           🔴  Auto Editor Task Dispatch Fixed  
+  #3194           🔵  Task Control Methods Need Similar Fix  
+..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\auto-cut\BasicTab.vue
+  #3195  2:39 PM  🔴  AutoCut Shared Speed/Volume Inputs Fixed  
+  #3196           🔴  AutoCut Speed/Volume Separation Complete  
+..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\pages\AutoCutPage.vue
+  #3197  2:40 PM  🔵  AutoCut File Input Identified  
+..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\composables\useAutoEditor.ts
+  #3198           🔵  Auto Editor Composable Identified  
+..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\components\common\FileDropInput.vue
+  #3199  2:41 PM  🔵  FileDropInput Multiple File Support Found  
+  #3200           🔵  FileDropInput Drop Handlers Confirmed  
+  #3201  2:42 PM  🔵  FileDropInput OnDrop Handler Logic  
+..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\composables\useAutoEditor.ts
+  #3202  2:43 PM  🔄  Auto Editor Composable Multi-File Support Started  
+..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\pages\AutoCutPage.vue
+  #3203  2:44 PM  🔄  AutoCutPage Single-File Component Identified  
+  #3204           ✅  AutoCut Multi-File Support Complete  
+..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\i18n\locales\en.ts
+  #3205  2:49 PM  🟣  Auto Cut multi-file selection support added  
+..\..\Git\GithubManager\ff-intelligent-neo\frontend\src\composables\useAutoEditor.ts
+  #3206           🟣  Auto Editor initialization state tracking added  
+  #3207           🟣  Auto Editor initialization lifecycle implemented
+```
+
+### 📝 Commit Message
+
+```
+feat(auto-editor): 修复状态闪烁、命令预览及输入交互，新增多文件支持
+
+- 静音/正常模式的速度/音量输入框独立，默认值4/0.5，非必要输入时冻结禁用
+- 解决加载时短暂显示“未配置”状态的问题
+- FileDropInput 支持多文件拖入/选择，同时修复点击无法打开对话框的问题
+- 命令预览在无文件时显示占位符命令，触发立即预览
+- 自动剪辑任务正确调度至 auto-editor 流程，而非默认 ffmpeg
+```
+
+### 🚀 Release Notes
+
+```
+## 2026-04-27 - 自动剪辑交互与稳定性优化
+
+### ✨ 新增
+- 静音与正常模式的速度/音量配置相互独立，各自拥有独立的输入框，默认值符合预期
+- 支持拖入或选择多个文件，配合占位符命令预览，可先行查看命令再添加任务
+- 无文件时仍可预览自动剪辑命令，便于提前检查参数
+
+### 🐛 修复
+- 修复进入自动剪辑页面时状态栏短暂闪现“未配置”提示的问题
+- 修复文件拖入区域点击后无法弹出文件选择对话框的问题
+- 自动剪辑任务现已正确执行 auto-editor 流程，不再误用转码命令
+
+### ⚡ 优化
+- 参数输入框不再动态显示/隐藏，无需求时保持冻结状态，避免界面布局抖动
+- 阈值等浮点数显示保留固定小数位数（如 0.10、0.20），确保排版稳定
+```
 
 ## 问题1
 

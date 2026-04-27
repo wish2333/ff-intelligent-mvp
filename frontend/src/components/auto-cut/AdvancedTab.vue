@@ -2,26 +2,23 @@
 /**
  * AdvancedTab - Auto-editor advanced parameters.
  *
- * Six sections: Actions, Timeline, Container, Video, Audio, Misc.
- * Codec dropdowns populated dynamically from encoder query.
+ * Sections: Actions, Timeline, Container switches, Video params, Audio params, Output.
  * Range lists support add/remove.
  *
  * v2.2.0 Phase 4.
  */
 
 import { useI18n } from "vue-i18n"
-import type { AdvancedOptions, EncoderLists } from "../../types/autoEditor"
+import type { AdvancedOptions } from "../../types/autoEditor"
 
 const { t } = useI18n()
 
 const props = defineProps<{
   advancedOptions: AdvancedOptions
-  encoderLists: EncoderLists
 }>()
 
 const emit = defineEmits<{
   "update:advancedOptions": [value: AdvancedOptions]
-  "fetchEncoders": [format: string]
 }>()
 
 function updateField<K extends keyof AdvancedOptions>(field: K, value: AdvancedOptions[K]) {
@@ -47,11 +44,6 @@ function updateRange(field: "cutOutRanges" | "addInRange" | "setActionRanges", i
     ...props.advancedOptions,
     [field]: props.advancedOptions[field].map((v: string, i: number) => i === index ? value : v),
   })
-}
-
-function handleExtensionChange(ext: string) {
-  updateField("outputExtension", ext)
-  emit("fetchEncoders", ext)
 }
 </script>
 
@@ -191,94 +183,25 @@ function handleExtensionChange(ext: string) {
       />
     </div>
 
-    <!-- Section: Container -->
+    <!-- Section: Switches -->
     <div class="form-control md:col-span-2">
       <label class="label">
-        <span class="label-text font-semibold">{{ t("autoCut.advancedSections.container") }}</span>
+        <span class="label-text font-semibold">{{ t("autoCut.advancedSections.switches") }}</span>
       </label>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <label class="label cursor-pointer gap-2 justify-start">
-          <input
-            type="checkbox"
-            class="toggle toggle-sm toggle-primary"
-            :checked="advancedOptions.vn"
-            @change="updateField('vn', ($event.target as HTMLInputElement).checked)"
-          />
-          <span class="label-text text-sm">{{ t("autoCut.disableVideo") }}</span>
-        </label>
-        <label class="label cursor-pointer gap-2 justify-start">
-          <input
-            type="checkbox"
-            class="toggle toggle-sm toggle-primary"
-            :checked="advancedOptions.an"
-            @change="updateField('an', ($event.target as HTMLInputElement).checked)"
-          />
-          <span class="label-text text-sm">{{ t("autoCut.disableAudio") }}</span>
-        </label>
-        <label class="label cursor-pointer gap-2 justify-start">
-          <input
-            type="checkbox"
-            class="toggle toggle-sm toggle-primary"
-            :checked="advancedOptions.sn"
-            @change="updateField('sn', ($event.target as HTMLInputElement).checked)"
-          />
-          <span class="label-text text-sm">{{ t("autoCut.disableSubtitle") }}</span>
-        </label>
-        <label class="label cursor-pointer gap-2 justify-start">
-          <input
-            type="checkbox"
-            class="toggle toggle-sm toggle-primary"
-            :checked="advancedOptions.dn"
-            @change="updateField('dn', ($event.target as HTMLInputElement).checked)"
-          />
-          <span class="label-text text-sm">{{ t("autoCut.disableData") }}</span>
-        </label>
+        <label class="label cursor-pointer gap-2 justify-start"><input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="advancedOptions.vn" @change="updateField('vn', ($event.target as HTMLInputElement).checked)" /><span class="label-text text-sm">{{ t("autoCut.disableVideo") }}</span></label>
+        <label class="label cursor-pointer gap-2 justify-start"><input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="advancedOptions.an" @change="updateField('an', ($event.target as HTMLInputElement).checked)" /><span class="label-text text-sm">{{ t("autoCut.disableAudio") }}</span></label>
+        <label class="label cursor-pointer gap-2 justify-start"><input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="advancedOptions.sn" @change="updateField('sn', ($event.target as HTMLInputElement).checked)" /><span class="label-text text-sm">{{ t("autoCut.disableSubtitle") }}</span></label>
+        <label class="label cursor-pointer gap-2 justify-start"><input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="advancedOptions.dn" @change="updateField('dn', ($event.target as HTMLInputElement).checked)" /><span class="label-text text-sm">{{ t("autoCut.disableData") }}</span></label>
+        <label class="label cursor-pointer gap-2 justify-start"><input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="advancedOptions.faststart" @change="updateField('faststart', ($event.target as HTMLInputElement).checked)" /><span class="label-text text-sm">{{ t("autoCut.faststart") }}</span></label>
+        <label class="label cursor-pointer gap-2 justify-start"><input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="advancedOptions.fragmented" @change="updateField('fragmented', ($event.target as HTMLInputElement).checked)" /><span class="label-text text-sm">{{ t("autoCut.fragmented") }}</span></label>
+        <label class="label cursor-pointer gap-2 justify-start"><input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="advancedOptions.noCache" @change="updateField('noCache', ($event.target as HTMLInputElement).checked)" /><span class="label-text text-sm">{{ t("autoCut.noCache") }}</span></label>
+        <label class="label cursor-pointer gap-2 justify-start"><input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="advancedOptions.open" @change="updateField('open', ($event.target as HTMLInputElement).checked)" /><span class="label-text text-sm">{{ t("autoCut.openAfter") }}</span></label>
       </div>
+      <span v-if="advancedOptions.open" class="label-text-alt text-warning text-xs mt-1">{{ t("autoCut.openWarning") }}</span>
     </div>
 
-    <div class="form-control">
-      <label class="label cursor-pointer justify-start gap-2">
-        <input
-          type="checkbox"
-          class="toggle toggle-sm toggle-primary"
-          :checked="advancedOptions.faststart"
-          @change="updateField('faststart', ($event.target as HTMLInputElement).checked)"
-        />
-        <span class="label-text">{{ t("autoCut.faststart") }}</span>
-      </label>
-    </div>
-
-    <div class="form-control">
-      <label class="label cursor-pointer justify-start gap-2">
-        <input
-          type="checkbox"
-          class="toggle toggle-sm toggle-primary"
-          :checked="advancedOptions.fragmented"
-          @change="updateField('fragmented', ($event.target as HTMLInputElement).checked)"
-        />
-        <span class="label-text">{{ t("autoCut.fragmented") }}</span>
-      </label>
-    </div>
-
-    <!-- Section: Video -->
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text font-semibold">{{ t("autoCut.advancedSections.video") }}</span>
-      </label>
-      <select
-        :value="advancedOptions.videoCodec"
-        class="select select-bordered select-sm w-full"
-        @change="updateField('videoCodec', ($event.target as HTMLSelectElement).value)"
-      >
-        <option value=""></option>
-        <option
-          v-for="codec in encoderLists.video"
-          :key="'v-' + codec"
-          :value="codec"
-        >{{ codec }}</option>
-      </select>
-    </div>
-
+    <!-- Section: Video params -->
     <div class="form-control">
       <label class="label">
         <span class="label-text">{{ t("autoCut.videoBitrate") }}</span>
@@ -305,25 +228,7 @@ function handleExtensionChange(ext: string) {
       />
     </div>
 
-    <!-- Section: Audio -->
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text font-semibold">{{ t("autoCut.advancedSections.audio") }}</span>
-      </label>
-      <select
-        :value="advancedOptions.audioCodec"
-        class="select select-bordered select-sm w-full"
-        @change="updateField('audioCodec', ($event.target as HTMLSelectElement).value)"
-      >
-        <option value=""></option>
-        <option
-          v-for="codec in encoderLists.audio"
-          :key="'a-' + codec"
-          :value="codec"
-        >{{ codec }}</option>
-      </select>
-    </div>
-
+    <!-- Section: Audio params -->
     <div class="form-control">
       <label class="label">
         <span class="label-text">{{ t("autoCut.audioBitrate") }}</span>
@@ -366,37 +271,7 @@ function handleExtensionChange(ext: string) {
       </select>
     </div>
 
-    <!-- Section: Misc -->
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text font-semibold">{{ t("autoCut.advancedSections.misc") }}</span>
-      </label>
-      <label class="label cursor-pointer justify-start gap-2">
-        <input
-          type="checkbox"
-          class="toggle toggle-sm toggle-primary"
-          :checked="advancedOptions.noCache"
-          @change="updateField('noCache', ($event.target as HTMLInputElement).checked)"
-        />
-        <span class="label-text">{{ t("autoCut.noCache") }}</span>
-      </label>
-    </div>
-
-    <div class="form-control">
-      <label class="label cursor-pointer justify-start gap-2">
-        <input
-          type="checkbox"
-          class="toggle toggle-sm toggle-primary"
-          :checked="advancedOptions.open"
-          @change="updateField('open', ($event.target as HTMLInputElement).checked)"
-        />
-        <span class="label-text">{{ t("autoCut.openAfter") }}</span>
-      </label>
-      <span v-if="advancedOptions.open" class="label-text-alt text-warning text-xs">
-        {{ t("autoCut.openWarning") }}
-      </span>
-    </div>
-
+    <!-- Output -->
     <div class="form-control">
       <label class="label">
         <span class="label-text">{{ t("autoCut.outputExtension") }}</span>
@@ -404,7 +279,7 @@ function handleExtensionChange(ext: string) {
       <select
         :value="advancedOptions.outputExtension"
         class="select select-bordered select-sm w-full"
-        @change="handleExtensionChange(($event.target as HTMLSelectElement).value)"
+        @change="updateField('outputExtension', ($event.target as HTMLSelectElement).value)"
       >
         <option value=".mp4">.mp4</option>
         <option value=".mkv">.mkv</option>

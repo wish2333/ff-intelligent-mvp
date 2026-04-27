@@ -344,6 +344,9 @@ class FFmpegApi(Bridge):
     def start_task(self, task_id: str, config: dict | None = None) -> dict:
         """Start executing a single pending task with the current config."""
         try:
+            task = self._queue.get_task(task_id)
+            if task is not None and getattr(task, 'task_type', '') == 'auto_editor':
+                return self._auto_editor.start_auto_editor_task(task_id)
             ok = self._runner.start_task(task_id, config=config)
             return {"success": ok, "data": None}
         except Exception as exc:
@@ -354,6 +357,9 @@ class FFmpegApi(Bridge):
     def stop_task(self, task_id: str) -> dict:
         """Stop a single task (pending / running / paused)."""
         try:
+            task = self._queue.get_task(task_id)
+            if task is not None and getattr(task, 'task_type', '') == 'auto_editor':
+                return self._auto_editor.cancel_auto_editor_task(task_id)
             ok = self._runner.stop_task(task_id)
             return {"success": ok, "data": None}
         except Exception as exc:
@@ -384,6 +390,13 @@ class FFmpegApi(Bridge):
     def retry_task(self, task_id: str, config: dict | None = None) -> dict:
         """Retry a failed task with the current config."""
         try:
+            task = self._queue.get_task(task_id)
+            if task is not None and getattr(task, 'task_type', '') == 'auto_editor':
+                # Reset state then re-execute with stored params
+                ok = self._runner.reset_task(task_id)
+                if not ok:
+                    return {"success": False, "error": "Failed to reset task"}
+                return self._auto_editor.start_auto_editor_task(task_id)
             ok = self._runner.retry_task(task_id, config=config)
             return {"success": ok, "data": None}
         except Exception as exc:

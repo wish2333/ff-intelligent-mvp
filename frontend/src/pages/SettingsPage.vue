@@ -26,7 +26,7 @@ onMounted(async () => {
     s.fetchSettings()
     s.fetchFfmpegVersions()
     s.fetchAppInfo()
-    ae.fetchStatus()
+    await ae.fetchStatus()
   } catch (err) {
     console.error("[SettingsPage] mount failed:", err)
   }
@@ -42,7 +42,7 @@ async function handleOutputDirChange(value: string): Promise<void> {
 
 async function handleSelectAutoEditorBinary(): Promise<void> {
   try {
-    const res = await call<string>("select_file")
+    const res = await call<string>("select_file_filtered")
     if (res.success && res.data) {
       ae.setPath(res.data)
     }

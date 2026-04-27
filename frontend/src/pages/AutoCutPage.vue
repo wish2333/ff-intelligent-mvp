@@ -3,15 +3,17 @@
  * Page: Auto Cut
  *
  * Automatic silence/motion detection and cutting using auto-editor.
+ * Supports multiple file input - one task per file added to queue.
  * Uses useAutoEditor composable for all state management.
  *
  * v2.2.0 Phase 2: Initial page shell.
  * v2.2.0 Phase 3: Extract BasicTab as independent component.
  */
 
-import { ref, computed, onMounted, onUnmounted } from "vue"
+import { ref, computed, watch, onMounted, onUnmounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRouter } from "vue-router"
+import { waitForPyWebView } from "../bridge"
 import { useAutoEditor } from "../composables/useAutoEditor"
 import CommandPreview from "../components/config/CommandPreview.vue"
 import FileDropInput from "../components/common/FileDropInput.vue"
@@ -29,23 +31,32 @@ const {
   whenNormalAction,
   margin,
   smooth,
-  speedValue,
-  volumeValue,
+  silentSpeedValue,
+  silentVolumeValue,
+  normalSpeedValue,
+  normalVolumeValue,
   advancedOptions,
-  encoderLists,
-  selectedFile,
+
+
   autoEditorStatus,
   commandPreview,
   validating,
   alertMessage,
   alertType,
+  selectedFile,
+  initializing,
   init,
   dispose,
   addToQueue,
-  fetchEncoders,
 } = useAutoEditor()
 
 const activeTab = ref("basic")
+const selectedFiles = ref<string[]>([])
+const displayFile = computed(() => {
+  if (selectedFiles.value.length === 0) return ""
+  if (selectedFiles.value.length === 1) return selectedFiles.value[0]
+  return t("autoCut.multipleFiles", { count: selectedFiles.value.length })
+})
 
 const isReady = computed(
   () => autoEditorStatus.value.available && autoEditorStatus.value.compatible,
@@ -67,14 +78,38 @@ function handleTabClick(tab: string) {
   activeTab.value = tab
 }
 
+function handleFilesChanged(path: string) {
+  if (path) {
+    selectedFiles.value = [...selectedFiles.value, path]
+  }
+}
+
+function handleClearFiles() {
+  selectedFiles.value = []
+}
+
+watch(selectedFiles, (files) => {
+  selectedFile.value = files.length > 0 ? files[0] : null
+})
+
 async function handleAddToQueue() {
-  const success = await addToQueue()
-  if (success) {
+  if (selectedFiles.value.length === 0) return
+  let allSuccess = true
+  for (const file of selectedFiles.value) {
+    const success = await addToQueue(file)
+    if (!success) allSuccess = false
+  }
+  if (allSuccess) {
     router.push("/task-queue")
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    await waitForPyWebView()
+  } catch {
+    // pywebview may already be ready if navigated from another page
+  }
   init()
 })
 
@@ -93,7 +128,7 @@ onUnmounted(() => {
 
     <!-- Status bar -->
     <div
-      v-if="statusMessage"
+      v-if="statusMessage && !initializing"
       class="alert alert-warning py-2 px-4 text-sm"
     >
       {{ statusMessage }}
@@ -110,11 +145,18 @@ onUnmounted(() => {
 
     <!-- File input -->
     <FileDropInput
-      :model-value="selectedFile ?? ''"
+      :model-value="displayFile"
       :placeholder="t('common.dropDefault')"
       accept=".mp4,.mov,.mkv,.m4v,.mp3,.wav,.m4a,.aac"
-      @update:model-value="selectedFile = $event || null"
+      @update:model-value="handleFilesChanged"
     />
+
+    <!-- Clear files button -->
+    <div v-if="selectedFiles.length > 0" class="flex justify-end">
+      <button class="btn btn-xs btn-ghost" @click="handleClearFiles">
+        {{ t("common.clear") }}
+      </button>
+    </div>
 
     <!-- Tab container -->
     <div role="tablist" class="tabs tabs-bordered">
@@ -142,8 +184,12 @@ onUnmounted(() => {
       :when-normal-action="whenNormalAction"
       :margin="margin"
       :smooth="smooth"
-      :speed-value="speedValue"
-      :volume-value="volumeValue"
+      :silent-speed-value="silentSpeedValue"
+      :silent-volume-value="silentVolumeValue"
+      :normal-speed-value="normalSpeedValue"
+      :normal-volume-value="normalVolumeValue"
+      :video-codec="advancedOptions.videoCodec"
+      :audio-codec="advancedOptions.audioCodec"
       @update:edit-method="editMethod = $event"
       @update:audio-threshold="audioThreshold = $event"
       @update:motion-threshold="motionThreshold = $event"
@@ -151,17 +197,19 @@ onUnmounted(() => {
       @update:when-normal-action="whenNormalAction = $event"
       @update:margin="margin = $event"
       @update:smooth="smooth = $event"
-      @update:speed-value="speedValue = $event"
-      @update:volume-value="volumeValue = $event"
+      @update:silent-speed-value="silentSpeedValue = $event"
+      @update:silent-volume-value="silentVolumeValue = $event"
+      @update:normal-speed-value="normalSpeedValue = $event"
+      @update:normal-volume-value="normalVolumeValue = $event"
+      @update:video-codec="advancedOptions = { ...advancedOptions, videoCodec: $event }"
+      @update:audio-codec="advancedOptions = { ...advancedOptions, audioCodec: $event }"
     />
 
     <!-- Advanced tab -->
     <AdvancedTab
       v-show="activeTab === 'advanced'"
       :advanced-options="advancedOptions"
-      :encoder-lists="encoderLists"
       @update:advanced-options="advancedOptions = $event"
-      @fetch-encoders="fetchEncoders($event)"
     />
 
     <!-- Command preview -->
@@ -176,7 +224,7 @@ onUnmounted(() => {
     <!-- Add to queue -->
     <button
       class="btn btn-primary w-full"
-      :disabled="!isReady || !selectedFile"
+      :disabled="!isReady || selectedFiles.length === 0"
       @click="handleAddToQueue"
     >
       {{ t("autoCut.addToQueue") }}

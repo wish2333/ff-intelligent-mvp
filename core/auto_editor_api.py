@@ -28,7 +28,7 @@ from core.models import AppSettings, Task, TaskConfig
 
 logger = get_logger()
 
-_VERSION_RE = re.compile(r"auto-editor\s+(\d+)\.(\d+)\.(\d+)")
+_VERSION_RE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 
 
 def _run_subprocess(
@@ -416,7 +416,9 @@ class AutoEditorApi:
             if not input_file:
                 return {"success": False, "error": "input_file is required"}
 
-            validate_local_input(input_file)
+            # Allow placeholder paths for preview (when no real file is selected)
+            if not input_file.startswith("_placeholder"):
+                validate_local_input(input_file)
 
             settings = load_settings()
             auto_editor_path = settings.auto_editor_path
@@ -509,9 +511,6 @@ class AutoEditorApi:
                 input_file=pending["input_file"],
                 output_path=pending["output_path"],
             )
-
-            # Clean up stored params after submission
-            self._pending_auto_editor_tasks.pop(task_id, None)
 
             return {"success": True, "data": None}
         except Exception as exc:

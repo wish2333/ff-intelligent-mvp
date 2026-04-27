@@ -207,11 +207,11 @@ API methods (all return `{'success': bool, 'data': ..., 'error': ...}`):
 Layout:
 ```
 AutoCutPage.vue
-├── Status bar (auto-editor availability: path set? version compatible?)
-├── FileDropInput (single file only, reject URLs and multiple files)
+├── Status bar (initializing 期间隐藏防闪烁，就绪时隐藏)
+├── FileDropInput (多文件支持，:multiple="true"，逐个文件创建任务)
 ├── Tab container (BasicTab | AdvancedTab)
-├── CommandPreview (type='auto-editor')
-└── Action button: "Add to Queue"
+├── CommandPreview (type='auto-editor', immediate 触发预览)
+└── Action button: "Add to Queue" (多文件逐个添加，全成功跳转)
 ```
 
 Status bar states:
@@ -283,23 +283,28 @@ Methods:
 Controls:
 | Control | Type | Default | Notes |
 |---------|------|---------|-------|
-| Edit method | Radio/Select | audio | audio, motion (subtitle hidden) |
+| Edit method | Select | audio | audio, motion (subtitle hidden) |
 | Threshold | Slider | 0.04 (audio) / 0.02 (motion) | Range 0.01-0.20, step 0.01 |
-| When-silent action | Select | cut | cut, speed:X, volume:X, nil |
-| When-normal action | Select | nil | nil, cut, speed:X, volume:X |
-| Speed value | Input | 4 | Shown when speed action selected |
-| Volume value | Input | 0.5 | Shown when volume action selected |
+| When-silent action | Select | cut | cut, speed, volume, nil |
+| When-normal action | Select | nil | nil, cut, speed, volume |
+| Silent speed value | Input | 4 | 独立输入框，仅当 silent action 为 speed 时可用 |
+| Silent volume value | Input | 0.5 | 独立输入框，仅当 silent action 为 volume 时可用 |
+| Normal speed value | Input | 4 | 独立输入框，仅当 normal action 为 speed 时可用 |
+| Normal volume value | Input | 0.5 | 独立输入框，仅当 normal action 为 volume 时可用 |
 | Margin | Input | 0.2s | |
 | Smooth mincut | Input | 0.2s | |
 | Smooth minclip | Input | 0.1s | |
+| Video codec | Categorized select | "" (auto) | 推荐/硬件加速/其他/自定义，optgroup 分组 |
+| Audio codec | Categorized select | "" (auto) | 推荐/其他/自定义，optgroup 分组 |
 
-Action value inputs show/hide based on selected action type.
+Action value inputs: silent 和 normal 各自独立，选择非 speed/volume 时冻结（disabled）而非隐藏，避免排版变动。
 
 **Acceptance criteria:**
 - Switching edit method swaps threshold value and range
-- Action value inputs appear/disappear dynamically
-- All values bound to useAutoEditor composable
-- Threshold slider shows numeric value
+- Silent 和 normal 的 speed/volume 输入框完全独立、不共用
+- 选择 cut/nil 时输入框冻结不消失，防止布局抖动
+- 编码器选择使用静态 curated 列表（`autoEditorEncoders.ts`），分组显示
+- Threshold slider shows numeric value with fixed 2 decimal places
 
 ---
 
@@ -314,16 +319,15 @@ Action value inputs show/hide based on selected action type.
 Sections:
 1. **Actions**: Cut-out ranges, Add-in ranges, Set-action ranges (dynamic list, add/remove)
 2. **Timeline**: Frame rate, Sample rate, Resolution inputs
-3. **Container**: Toggle switches for `-vn`/`-an`/`-sn`/`-dn`, Faststart (default ON, flag only when OFF), Fragmented (default OFF, flag only when ON)
-4. **Video**: Codec select (populated from encoder query), Bitrate input, CRF input
-5. **Audio**: Codec select (populated from encoder query), Bitrate input, Layout input, Normalize select (none/peak/ebu)
-6. **Misc**: No-cache toggle, Open toggle (with queue warning), Output extension select (mp4/mkv/mov)
+3. **Switches**: 8 个 toggle 开关整合在一个分区 — vn/an/sn/dn + faststart + fragmented + noCache + open，响应式网格布局
+4. **Video params**: Bitrate input, CRF input（编码器已移至 BasicTab）
+5. **Audio params**: Bitrate input, Layout input, Normalize select（编码器已移至 BasicTab）
+6. **Output**: Output extension select (mp4/mkv/mov)
 
 **Acceptance criteria:**
-- Codec dropdowns populated dynamically from `get_auto_editor_encoders(format)`
-- Output extension change triggers re-query of encoders
+- 编码器选择移至 BasicTab，使用静态 curated 列表
+- 8 个 toggle 开关整合为一个 Switches 分区
 - Range lists support add/remove with validation
-- Container toggles follow design: faststart ON = no flag, OFF = `--no-faststart`
 
 ---
 
@@ -351,18 +355,21 @@ Sections:
 
 ---
 
-#### 5.2 FileDropInput - Single file constraint
+#### 5.2 FileDropInput - Multi-file support
 
 **File:** `frontend/src/components/common/FileDropInput.vue`
 
-- Add `multiple` prop (default true for backward compat)
-- When `multiple=false`: reject multiple files with error "Please select only one file"
-- AutoCutPage uses `:multiple="false"`
+- `multiple` prop (default true for backward compat)
+- When `multiple=true`: 拖拽和文件对话框均支持多文件，逐个 emit
+- When `multiple=false`: reject multiple files with error
+- 文件对话框根据 `multiple` 选择调用 `select_files`（多文件）或 `select_file_filtered`（单文件）
+- 不向 pywebview 传递 file_types 参数（Windows 兼容性），前端校验扩展名
+- AutoCutPage uses `:multiple="true"`
 
 **Acceptance criteria:**
+- 拖拽多个文件时逐个 emit，AutoCutPage 逐个追加到 selectedFiles
+- 点击打开多文件对话框，可同时选择多个文件
 - Existing pages with multiple file support unchanged
-- AutoCutPage rejects multiple files
-- Error message displayed when multiple files dropped
 
 ---
 
@@ -484,13 +491,58 @@ Phases 3, 4, 5 can be partially parallelized after Phase 2 is complete.
 
 ---
 
+### Phase 7: Bugfixes & Refinements
+
+> Goal: Fix issues discovered in Phases 1-6 testing; refine UI/UX.
+
+#### 7.1 Command building fix: --edit METHOD:THRESHOLD format
+
+- 移除 `--my-thresh` flag（auto-editor v30 不支持），阈值嵌入 `--edit` flag：`--edit audio:0.04`
+- 更新 `build_command` 中 `--edit` 的构建逻辑
+
+#### 7.2 Command preview improvements
+
+- watch 添加 `{ immediate: true }` 确保页面加载时立即显示命令预览
+- `selectedFile` 加入 watch 依赖，文件选择后自动更新预览
+- 占位文件 `_placeholder.mp4` 在预览 API 中跳过验证
+
+#### 7.3 Speed/Volume input independence
+
+- `speedValue`/`volumeValue` 拆分为 `silentSpeedValue`/`silentVolumeValue`/`normalSpeedValue`/`normalVolumeValue`
+- Silent 和 normal 各自拥有独立的 speed/volume 输入框
+- 非 speed/volume action 时输入框冻结（disabled）而非隐藏
+
+#### 7.4 Encoder list refactor
+
+- 移除动态 `fetchEncoders` 查询，改用静态 curated 列表 `autoEditorEncoders.ts`
+- 编码器按 optgroup 分组：推荐 / 硬件加速 / 其他 / 自定义
+- 编码器选择从 AdvancedTab 移至 BasicTab
+
+#### 7.5 AdvancedTab restructure
+
+- 8 个 toggle 开关整合为一个 Switches 分区（grid 布局）
+- 移除 Video/Audio 编码器分区（已移至 BasicTab）
+- 移除 Container/Misc 独立分区
+
+#### 7.6 Settings & FileDropInput fixes
+
+- AutoEditorSetup 路径容器 `min-h-[2.5rem]` 预留空间
+- FileDropInput 多文件支持：拖拽和对话框均 emit 所有文件
+- FileDropInput 不向 pywebview 传递 file_types（Windows 兼容性）
+- AutoCutPage `initializing` 标志防止状态栏闪烁
+
+#### 7.7 Task dispatch fix
+
+- `retry_task` 增加 `auto_editor` task_type 检查
+- `start_auto_editor_task` 不再 pop pending params（支持 retry）
+
 ## Out of Scope (v1)
 
 - URL download integration (yt-dlp)
 - Subtitle edit method (needs pattern parameter UI)
 - Timeline visualization of cuts
 - Preview of edited output before saving
-- Batch processing (multiple files)
+- Batch processing (multi-file queueing supported in v1, but no batch parameter sync)
 - Binary auto-downloader
 - Audio-only output formats (.mp3/.wav/.m4a)
 - "Run Now" button (queue-only in v1)

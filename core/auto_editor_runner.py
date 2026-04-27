@@ -106,20 +106,16 @@ def build_command(
     # --progress machine (always added)
     cmd.extend(["--progress", "machine"])
 
-    # Edit method
+    # Edit method with embedded threshold: --edit audio:0.04 or --edit motion:0.02
+    # https://auto-editor.com/ref/edit
     edit_method = params.get("edit", "audio")
     if edit_method in _EDIT_ACTIONS:
-        cmd.extend(["--edit", edit_method])
-
-    # Threshold (key name depends on edit method)
-    if edit_method == "audio":
-        threshold = params.get("audio_threshold", params.get("threshold", "0.04"))
+        threshold = params.get("audio_threshold" if edit_method == "audio" else "motion_threshold",
+                               params.get("threshold", ""))
         if threshold:
-            cmd.extend(["--my-thresh", str(threshold)])
-    elif edit_method == "motion":
-        threshold = params.get("motion_threshold", params.get("threshold", "0.02"))
-        # For motion, threshold is embedded in --edit (e.g. --edit motion:0.02)
-        # already handled above, so we don't add --my-thresh
+            cmd.extend(["--edit", f"{edit_method}:{threshold}"])
+        else:
+            cmd.extend(["--edit", edit_method])
 
     # Margin
     margin = params.get("margin", "")
@@ -281,13 +277,16 @@ def generate_output_path(
     if not os.access(dir_path, os.W_OK):
         raise ValueError(f"Output directory is not writable: {output_dir}")
 
+    # Path traversal prevention: check the raw input_file for traversal patterns
+    # Normalize to forward slashes for consistent checking
+    normalized_input = input_file.replace("\\", "/")
+    if ".." in normalized_input or normalized_input.startswith("/") or "//" in normalized_input:
+        raise ValueError(f"Invalid input file name for path generation: {input_file}")
+
     stem = Path(input_file).stem
     # Normalize extension: ensure it starts with '.'
     if extension and not extension.startswith("."):
         extension = f".{extension}"
-    # Path traversal prevention
-    if ".." in stem or "/" in stem or "\\" in stem:
-        raise ValueError(f"Invalid input file name for path generation: {input_file}")
 
     short_id = task_id[:8] if len(task_id) >= 8 else task_id
     filename = f"{stem}_{short_id}{extension}"

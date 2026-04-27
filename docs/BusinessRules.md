@@ -552,7 +552,7 @@
 | 规则 | 说明 |
 |------|------|
 | URL 拒绝 | auto-editor 不支持 URL 输入，输入 http/https/ftp scheme 时抛出 ValueError |
-| 单文件限制 | v1 仅支持单文件处理，拒绝多文件输入 |
+| 多文件支持 | AutoCutPage 支持多文件输入，每个文件独立创建一个 auto_editor 任务加入队列 |
 | 扩展名白名单 | `.mp4`, `.mov`, `.mkv`, `.m4v`, `.mp3`, `.wav`, `.m4a`, `.aac` |
 | audio+motion 互斥 | 当 edit 方法为 motion 时，若同时设置了 `-an`（禁用音频），应警告用户 |
 
@@ -569,11 +569,14 @@
 
 | 规则 | 说明 |
 |------|------|
+| 编辑方法格式 | `--edit METHOD:THRESHOLD`（如 `--edit audio:0.04`），阈值直接嵌入 --edit flag，不使用 --my-thresh |
 | 进度格式 | 自动添加 `--progress machine`，不依赖用户配置 |
-| 预览模式 | 当 `_preview_mode` 为 true 时，使用占位输出路径，不生成真实文件 |
+| 预览模式 | placeholder 路径（`_placeholder.mp4`）跳过文件验证，命令预览始终可用 |
+| 预览触发 | watch `{ immediate: true }` + selectedFile 变化时立即触发 300ms debounced 预览 |
 | 多范围参数 | `--cut-out`、`--add-in`、`--set-action` 支持多范围，每个范围重复一次 flag |
 | 容器 flag 逻辑 | `--faststart` 默认开启（不发 flag），关闭时发 `--no-faststart`；`--fragmented` 反之 |
 | NO_COLOR | auto-editor 子进程强制设置 `NO_COLOR=1` 环境变量 |
+| shell=False | 所有 subprocess.Popen 调用不使用 shell=True |
 
 ### 输出路径规则
 
@@ -598,36 +601,45 @@
 
 | 规则 | 说明 |
 |------|------|
-| 状态栏 | 页面顶部显示 auto-editor 可用状态：未配置/版本不兼容/就绪 |
-| 单文件输入 | AutoCutPage 使用 FileDropInput 的 `multiple=false` 模式，拒绝多文件 |
+| 状态栏 | 初始化期间（`initializing=true`）完全隐藏防闪烁；就绪时隐藏 |
+| 多文件输入 | AutoCutPage 使用 FileDropInput 的 `multiple=true` 模式，支持多文件拖拽和选择 |
 | 选项卡 | Basic 和 Advanced 选项卡互斥显示（同一时间只显示一个） |
-| 命令预览 | 使用 `type="auto-editor"` 模式，纯文本显示命令 |
-| 按钮禁用 | 未配置 auto-editor 时，"Add to Queue" 按钮禁用 |
-| 任务添加 | 添加后跳转到任务队列页面 |
+| 编码器位置 | 编码器选择在 BasicTab 中（推荐/硬件加速/其他/自定义），非 AdvancedTab |
+| 开关整合 | AdvancedTab 的 8 个 toggle 开关统一在一个 Switches 分区 |
+| 按钮禁用 | 未配置 auto-editor 或无文件时 "Add to Queue" 按钮禁用 |
+| 任务添加 | 多文件逐个添加为独立任务，全成功跳转队列页面 |
 
 **命令预览**:
 
 | 规则 | 说明 |
 |------|------|
+| immediate 触发 | watch `{ immediate: true }` 确保页面加载时立即显示命令预览 |
 | debounce | 参数变更后 300ms debounce 调用后端 `preview_auto_editor_command` |
-| 参数构建 | composable 内收集所有参数，构建 params dict 传给后端 |
+| 文件同步 | `selectedFile` ref 通过 AutoCutPage watcher 从 `selectedFiles` 数组同步 |
+| 占位预览 | 无文件时使用 `_placeholder.mp4` 占位，后端跳过验证，预览始终可用 |
 | 切换阈值 | 切换 editMethod 时自动切换阈值默认值（audio 0.04 / motion 0.02） |
-| 状态监听 | 监听 `auto_editor_version_changed` 事件实时更新 auto-editor 状态 |
 
-| action 值输入 | 当 whenSilent/whenNormal 为 speed:X 时显示 Speed 输入框，值为 X；volume:X 同理 |
-
-### 前端页面规则（v2.2.0 Phase 4 — Advanced Tab）
-
-<!-- v2.2.0-CHANGE: 新增 AdvancedTab 业务规则 -->
-
-**编码器查询**:
+**action 值输入**:
 
 | 规则 | 说明 |
 |------|------|
-| 触发时机 | 初次进入 Advanced 选项卡时自动查询，output extension 变更时重新查询 |
-| 查询 API | `get_auto_editor_encoders(output_extension)` |
-| 结果缓存 | 查询结果存储在 composable 中，避免重复查询 |
-| 空结果 | 查询失败或未配置 auto-editor 时下拉框显示空选项 |
+| 独立分离 | silent 和 normal 各自拥有独立的 speed/volume 输入框，不共用 |
+| 动态显隐 | 选择 speed 时显示 Speed 输入框（默认值4），选择 volume 时显示 Volume 输入框（默认值0.5） |
+| 防排版变动 | 选择 cut/nil 时输入框冻结（disabled + opacity-50），而非隐藏 |
+
+### 前端页面规则（v2.2.0 Phase 4 — Advanced Tab）
+
+<!-- v2.2.0-CHANGE: Phase 7-11 重构 -->
+
+**编码器选择**:
+
+| 规则 | 说明 |
+|------|------|
+| 数据来源 | 静态 curated 列表 `autoEditorEncoders.ts`，非动态查询 |
+| 分组显示 | 视频: 推荐(libx264/libx265) / 硬件加速(9种GPU编码器) / 其他(AV1/VP9/MPEG4) |
+| 分组显示 | 音频: 推荐(aac/libmp3lame) / 其他(libopus/flac/libfdk_aac) |
+| 自定义输入 | 选择 "Custom..." 后显示文本输入框，可输入任意编码器名称 |
+| 位置 | 编码器选择在 BasicTab 中，非 AdvancedTab |
 
 **范围列表**:
 
@@ -638,13 +650,16 @@
 | 增删 | 动态列表，每行可删除，底部添加按钮 |
 | 空行过滤 | 构建 params 时过滤空字符串 |
 
-**Container Toggles**:
+**Switches（开关整合）**:
 
 | 规则 | 说明 |
 |------|------|
-| faststart 默认 ON | ON 时不发任何 flag（auto-editor 默认行为），OFF 时发 `--no-faststart` |
+| 统一分区 | 8 个 toggle 开关整合在一个 Switches 分区：vn/an/sn/dn + faststart + fragmented + noCache + open |
+| 布局 | `grid grid-cols-2 md:grid-cols-4 gap-2` 响应式网格 |
+| faststart 默认 ON | ON 时不发任何 flag，OFF 时发 `--no-faststart` |
 | fragmented 默认 OFF | OFF 时不发任何 flag，ON 时发 `--fragmented` |
 | vn/an/sn/dn | 开启时发对应的 `-vn`/`-an`/`-sn`/`-dn` flag |
+| open 警告 | 开启 open 时显示队列警告提示 |
 
 
 **导航与国际化**:
@@ -666,17 +681,19 @@
 | 组件位置 | AutoEditorSetup.vue 位于 SettingsPage 右侧列，与 ThreadCountInput 同列 |
 | 路径选择 | 通过文件选择器选择 auto-editor 二进制路径，后端执行 `--version` 验证 |
 | 版本检测 | 配置成功后显示版本号，不兼容时显示黄色警告 |
+| 路径显示 | 容器使用 `min-h-[2.5rem]` 预留空间，避免路径显示后排版变动 |
 | 事件监听 | 监听 `auto_editor_version_changed` 事件实时更新状态 |
 | 风格一致 | 与 FFmpegSetup.vue 保持相同的 badge 状态指示 + 操作按钮风格 |
 
-**FileDropInput 单文件约束规则**:
+**FileDropInput 多文件支持规则**:
 
 | 规则 | 说明 |
 |------|------|
-| multiple prop | 新增 `multiple` prop，默认 `true`（向后兼容） |
-| 多文件拒绝 | `multiple=false` 时，拖拽或选择多个文件显示错误提示 |
-| 错误提示 | 错误信息使用 i18n key `common.onlyOneFile` |
-| 使用场景 | AutoCutPage 使用 `:multiple="false"` |
+| multiple prop | 默认 `true`（向后兼容），`multiple=true` 时拖拽和文件对话框均支持多文件 |
+| 多文件 emit | 逐个 emit `update:modelValue`，每个文件触发一次 |
+| 文件对话框 | `multiple=true` 时调用 `select_files`（多文件），否则调用 `select_file_filtered`（单文件） |
+| 文件类型过滤 | 不向 pywebview 传递 file_types 参数（Windows 兼容性），改为前端 validateExtension 校验 |
+| 使用场景 | AutoCutPage 使用 `:multiple="true"` 支持多文件 |
 
 **任务队列集成规则**:
 
