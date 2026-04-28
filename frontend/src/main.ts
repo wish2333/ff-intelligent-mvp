@@ -8,7 +8,7 @@ import "./style.css"
 const origSetAttribute = Element.prototype.setAttribute
 Element.prototype.setAttribute = function (name: string, value: string) {
   if (name === '"') {
-    console.trace("[DEBUG] setAttribute called with '\"' as name", { value, element: this.tagName })
+    console.error("[DEBUG] setAttribute called with '\"' as name", { value, element: this.tagName, stack: new Error().stack })
     return
   }
   return origSetAttribute.call(this, name, value)
